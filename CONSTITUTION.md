@@ -10,9 +10,9 @@ belonging to whoever shouts loudest or commits fastest.
 
 ## 2. The only way a change enters the game
 
-````text
-idea → proposal → 48-hour ballot → ratified → reviewed PR → merged
 ```text
+idea → proposal → 48-hour ballot → ratified → reviewed PR → merged
+```
 
 No step may be skipped, and no one is exempt. A maintainer who wants a change opens a proposal like everyone
 else. The single exception is the bootstrap commit that creates this repository's review rules, which lands under
@@ -117,4 +117,3 @@ Changing this document is a proposal like any other, requiring a **2/3 supermajo
 ---
 
 _Signed by the founding contributors via DCO on their first commit._
-````

@@ -9,12 +9,12 @@ code against them.
 
 ## Branch layout
 
-````text
+```text
 ledger                                  orphan branch, append-only, force-push forbidden
 ├── ledger.jsonl                        one record per line, UTF-8, LF, no blank lines
 ├── votes/<decision_id>.json            frozen vote snapshot for that decision
 └── keys/ledger-<k>.pub                 Ed25519 public key used to sign records
-```text
+```
 
 CI reads the tip of `ledger`. `main` never contains it.
 
@@ -23,7 +23,7 @@ CI reads the tip of `ledger`. `main` never contains it.
 ```text
 canonical_json = json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 hash           = sha256(canonical_json).hexdigest()
-```text
+```
 
 `prev_hash` is **a field inside the record** and therefore inside the preimage. Only `hash` and `signature`
 are excluded.
@@ -83,7 +83,7 @@ Gate rule instead:
 ```text
 close_comment.created_at - open_comment.created_at == 48h   (GitHub-stamped, both of them)
 merge is allowed any time after close
-```text
+```
 
 GitHub **committer** timestamps only; author dates are chosen by the contributor and are trivially backdated.
 `window_hours` is removed rather than left in place meaning nothing.
@@ -95,24 +95,65 @@ GitHub **committer** timestamps only; author dates are chosen by the contributor
 Canonical bytes:
 
 ```json
-{"approvers":[{"gh_id":1001,"review_id":3912345678,"reviewed_sha":"4f2a9c1e8b7d6a5f4e3d2c1b0a9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d"}],"ballot_closed_at":"2026-11-25T19:00:00.000Z","ballot_id":"bal-2026-0001","ballot_snapshot_hash":"fb7fb3e41180e4e28cdb6b97355d5c3b358ebafeb2c23a6daefd3edd8a5a9563","close_comment_id":191234999,"created_by":"githubapp:ultimate-dream-ledger","decision_id":"dec-2026-0001","eligibility_snapshot_hash":"3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c","head_sha":"4f2a9c1e8b7d6a5f4e3d2c1b0a9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d","kind":"ratify","open_comment_id":191234567,"owner_decision":"reviewed","owner_notified_at":1795633200,"owner_override_ground":null,"prev_hash":"0000000000000000000000000000000000000000000000000000000000000000","proposal_body_sha256":"7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d","proposal_id":"prop-2026-0001","quorum_rule":{"quorum":"0.20","threshold":"0.50","weighted":false},"result":"ratified","schema_version":2,"scope_paths":["game/content/props/**","game/content/items/**"],"signer_key_id":"k1","supersedes":null,"tally":{"abstain":0,"approve":1,"reject":0},"votes_ref":"votes/dec-2026-0001.json","voting_hours":48}
-```json
+{
+  "approvers": [
+    {
+      "gh_id": 1001,
+      "review_id": 3912345678,
+      "reviewed_sha": "4f2a9c1e8b7d6a5f4e3d2c1b0a9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d"
+    }
+  ],
+  "ballot_closed_at": "2026-11-25T19:00:00.000Z",
+  "ballot_id": "bal-2026-0001",
+  "ballot_snapshot_hash": "fb7fb3e41180e4e28cdb6b97355d5c3b358ebafeb2c23a6daefd3edd8a5a9563",
+  "close_comment_id": 191234999,
+  "created_by": "githubapp:ultimate-dream-ledger",
+  "decision_id": "dec-2026-0001",
+  "eligibility_snapshot_hash": "3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c",
+  "head_sha": "4f2a9c1e8b7d6a5f4e3d2c1b0a9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d",
+  "kind": "ratify",
+  "open_comment_id": 191234567,
+  "owner_decision": "reviewed",
+  "owner_notified_at": 1795633200,
+  "owner_override_ground": null,
+  "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "proposal_body_sha256": "7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d",
+  "proposal_id": "prop-2026-0001",
+  "quorum_rule": { "quorum": "0.20", "threshold": "0.50", "weighted": false },
+  "result": "ratified",
+  "schema_version": 2,
+  "scope_paths": ["game/content/props/**", "game/content/items/**"],
+  "signer_key_id": "k1",
+  "supersedes": null,
+  "tally": { "abstain": 0, "approve": 1, "reject": 0 },
+  "votes_ref": "votes/dec-2026-0001.json",
+  "voting_hours": 48
+}
+```
 
 ```text
 H(record) = 5451538b45503c04b7d8b5e939628c3f7aee4c43735d22d6dca673146e2932a4
-```text
+```
 
 ### Vector B — vote snapshot
 
 Canonical bytes:
 
 ```json
-[{"body_sha256":"abababababababababababababababababababababababababababababababab","comment_id":191234701,"created_at":"2026-11-23T10:00:00.000Z","updated_at":"2026-11-23T10:00:00.000Z","voter_gh_id":1001}]
-```json
+[
+  {
+    "body_sha256": "abababababababababababababababababababababababababababababababab",
+    "comment_id": 191234701,
+    "created_at": "2026-11-23T10:00:00.000Z",
+    "updated_at": "2026-11-23T10:00:00.000Z",
+    "voter_gh_id": 1001
+  }
+]
+```
 
 ```text
 ballot_snapshot_hash = fb7fb3e41180e4e28cdb6b97355d5c3b358ebafeb2c23a6daefd3edd8a5a9563
-```text
+```
 
 ### Retired vectors — must fail
 
@@ -145,4 +186,3 @@ Records are append-only; a wrong record is superseded, and the old one stays for
   substitute for review.
 - Ed25519 signature verification (over the 64 raw hash bytes) and the `LEDGER_HEAD` anchor are specified but
   not yet wired.
-````

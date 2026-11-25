@@ -39,7 +39,7 @@ Four shapes. Field-level detail for the ledger record is in [`LEDGER-FORMAT.md`]
 
 ### proposal
 
-````text
+```text
 proposal_id      prop-YYYY-NNNN   stable, NOT the issue number
 title            str
 author_gh_id     int              numeric GitHub id
@@ -49,7 +49,7 @@ closed_at        ISO8601 Z        = the ballot close comment's created_at
 status           open | voting | ratified | rejected | withdrawn | superseded | merged
 scope_paths      [glob]           the PR diff must be a subset of these
 supersedes       proposal_id|null
-```text
+```
 
 `scope_paths` is what makes "in-scope" operational: CI fails a PR that touches a path the approved proposal did
 not authorise, even if the proposal was approved for something else entirely.
@@ -71,7 +71,7 @@ votes                   [{voter_gh_id, choice, comment_id, created_at, updated_a
 tally                   {approve, reject, abstain}
 quorum_met              bool
 result                  ratified | rejected | void
-```text
+```
 
 ## 4. Votes (answer D — settled)
 
@@ -158,4 +158,3 @@ Card ids are opaque strings on both sides. JARVIS's nodes: `t_22c8296e`, `t_62e0
 3. **Repo visibility** — the repository is public right now because the scaffold was pushed.
 4. **Bootstrap lock** — `main` requires two code-owner approvals and an approved proposal; neither can exist before
    the ledger does. Needs a WAIVER-0002 for the bootstrap sequence or a one-time ruleset bypass.
-````
