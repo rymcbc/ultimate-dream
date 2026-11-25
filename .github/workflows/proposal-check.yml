@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   proposal-check:
-    name: Verify Approved-Proposal Reference
+    name: proposal-check
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

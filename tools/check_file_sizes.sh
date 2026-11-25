@@ -14,7 +14,9 @@ FAIL=0
 # Files tracked by Git LFS
 LFS_FILES=$(git lfs ls-files 2>/dev/null | awk '{print $3}' | sort -u || true)
 
-# Check all files in the repo (excluding .git)
+# Check every file Git actually tracks (untracked and ignored paths - node_modules,
+# build output - can never reach the repository, so scanning them only wastes time
+# and produces false failures).
 while IFS= read -r -d '' file; do
   # Skip if it's an LFS pointer (the actual file is small)
   if echo "$LFS_FILES" | grep -qxF "$file"; then
@@ -41,7 +43,7 @@ while IFS= read -r -d '' file; do
       FAIL=1
     fi
   fi
-done < <(find . -type f ! -path "./.git/*" -print0)
+done < <(git ls-files -z)
 
 if [ "$FAIL" -eq 0 ]; then
   echo "✓ All files within size limits"
