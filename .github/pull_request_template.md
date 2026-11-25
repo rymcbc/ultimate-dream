@@ -1,13 +1,17 @@
 # Pull Request Template
 
 ## Description
+
 <!-- What does this PR do? Link the approved proposal. -->
 
 ## Approved-Proposal
+
 <!-- REQUIRED: Must be in format UD-### (e.g., UD-001). PRs without this will be blocked. -->
+
 Approved-Proposal: UD-
 
 ## Type of Change
+
 - [ ] Bug fix
 - [ ] New feature
 - [ ] Refactor / cleanup
@@ -17,6 +21,7 @@ Approved-Proposal: UD-
 - [ ] Other (describe):
 
 ## Checklist
+
 - [ ] My code follows the project's style guides (formatter passes)
 - [ ] I have added/updated tests for my changes
 - [ ] All CI checks pass locally (`./tools/ci_check.sh` or equivalent)
@@ -26,9 +31,11 @@ Approved-Proposal: UD-
 - [ ] I have signed my commits (`git commit -s`)
 
 ## Screenshots / Video (if visual)
+
 <!-- Drag & drop or link -->
 
 ## Additional Context
+
 <!-- Anything reviewers should know: breaking changes, migration steps, etc. -->
 
 ---

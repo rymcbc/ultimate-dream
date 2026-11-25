@@ -1,6 +1,6 @@
 # D-002 — Email transport: Gmail SMTP now, scale later
 
-**Decided by Ryan, 2026-11-25:** *"if we get to a place where we have alot of people we will decide how to deal with it then."*
+**Decided by Ryan, 2026-11-25:** _"if we get to a place where we have alot of people we will decide how to deal with it then."_
 
 ## Ruling
 

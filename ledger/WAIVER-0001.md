@@ -13,12 +13,12 @@ never start.
 
 **What the gate could not have checked at this moment:**
 
-| Check | State at this commit |
-|---|---|
-| Approved proposal record in `ledger` | ledger branch does not exist yet |
-| Two code-owner approvals | `CODEOWNERS` is being created by this commit |
-| `proposal-check` CI run | the workflow is introduced by this commit, so it has never run |
-| DCO sign-off | applies, and is satisfied by every commit in this history |
+| Check                                | State at this commit                                           |
+| ------------------------------------ | -------------------------------------------------------------- |
+| Approved proposal record in `ledger` | ledger branch does not exist yet                               |
+| Two code-owner approvals             | `CODEOWNERS` is being created by this commit                   |
+| `proposal-check` CI run              | the workflow is introduced by this commit, so it has never run |
+| DCO sign-off                         | applies, and is satisfied by every commit in this history      |
 
 **Scope:** the waiver covers this one commit SHA and nothing else. The gate arms on the next commit. Any
 later commit citing this waiver is a bug in the verifier, not a permitted exception.

@@ -5,19 +5,19 @@ and who is told.
 
 ## The 48-hour loop
 
-| T | Event | Who acts | Where it is recorded |
-|---|---|---|---|
-| T-∞ | Proposal opened from the issue form | anyone with a linked account | GitHub issue, `prop-YYYY-NNNN` |
-| T-24h at latest | Triage: scope confirmed, split if oversized | maintainers | issue label + comment |
-| **T+0** | **Ballot opens.** Nonce published, eligibility frozen, votes accepted from this second | system | ledger `open_comment_id` |
-| **T+0** | **Notifications fan out** — Discord DM, email, Telegram, per each contributor's chosen channel | system | audit log, per-recipient delivery result |
-| **T+0** | **Owner review request** — Discord DM to Ryan: ballot, proposal, close time, Review / Override | system → Ryan | audit log `owner_notified_at` |
-| T+0…T+48h | Voting and discussion; owner may override with a cited ground | eligible roster | each vote is a GitHub-authored artifact |
-| **T+48h** | **Close.** Votes frozen into a snapshot, tally computed, result recorded | system | ledger record + `votes/<decision_id>.json` |
-| T+48h | Result announced on the same channels the ballot was announced | system | audit log |
-| T+48h → | Implementation PRs may open; gate verifies the ledger record | contributors | PR |
-| merge | Requires 2 code-owner reviews on head, DCO, scope match, green CI | code owners | `main` |
-| merge + | `docs/DECISIONS/<id>.md` written, roadmap regenerated | system | repo |
+| T               | Event                                                                                          | Who acts                     | Where it is recorded                       |
+| --------------- | ---------------------------------------------------------------------------------------------- | ---------------------------- | ------------------------------------------ |
+| T-∞             | Proposal opened from the issue form                                                            | anyone with a linked account | GitHub issue, `prop-YYYY-NNNN`             |
+| T-24h at latest | Triage: scope confirmed, split if oversized                                                    | maintainers                  | issue label + comment                      |
+| **T+0**         | **Ballot opens.** Nonce published, eligibility frozen, votes accepted from this second         | system                       | ledger `open_comment_id`                   |
+| **T+0**         | **Notifications fan out** — Discord DM, email, Telegram, per each contributor's chosen channel | system                       | audit log, per-recipient delivery result   |
+| **T+0**         | **Owner review request** — Discord DM to Ryan: ballot, proposal, close time, Review / Override | system → Ryan                | audit log `owner_notified_at`              |
+| T+0…T+48h       | Voting and discussion; owner may override with a cited ground                                  | eligible roster              | each vote is a GitHub-authored artifact    |
+| **T+48h**       | **Close.** Votes frozen into a snapshot, tally computed, result recorded                       | system                       | ledger record + `votes/<decision_id>.json` |
+| T+48h           | Result announced on the same channels the ballot was announced                                 | system                       | audit log                                  |
+| T+48h →         | Implementation PRs may open; gate verifies the ledger record                                   | contributors                 | PR                                         |
+| merge           | Requires 2 code-owner reviews on head, DCO, scope match, green CI                              | code owners                  | `main`                                     |
+| merge +         | `docs/DECISIONS/<id>.md` written, roadmap regenerated                                          | system                       | repo                                       |
 
 **There is no second waiting period.** The 48 hours covers both the vote and the notice, because every
 contributor was told at T+0 and had the whole window to object.
@@ -47,14 +47,14 @@ ballot twice on the same channel, and never make delivery a condition of a vote 
 
 ## Escalation
 
-| Situation | Action |
-|---|---|
-| Ballot below quorum | `void`, one automatic re-run with a fresh 48h, then fail closed |
-| Ballot tied | `rejected`, 14-day cooldown before re-proposal |
-| Owner override | ballot stops, `revoke` record with cited ground, challengeable by 2/3 of a fresh ballot |
-| Owner does not respond | ballot proceeds — silence is not an override |
-| Gate and record disagree | the gate wins by refusing; a human investigates before anyone touches the rule |
-| Proposer disagrees with a rejection | re-propose after cooldown with amendments, never a direct merge |
+| Situation                           | Action                                                                                  |
+| ----------------------------------- | --------------------------------------------------------------------------------------- |
+| Ballot below quorum                 | `void`, one automatic re-run with a fresh 48h, then fail closed                         |
+| Ballot tied                         | `rejected`, 14-day cooldown before re-proposal                                          |
+| Owner override                      | ballot stops, `revoke` record with cited ground, challengeable by 2/3 of a fresh ballot |
+| Owner does not respond              | ballot proceeds — silence is not an override                                            |
+| Gate and record disagree            | the gate wins by refusing; a human investigates before anyone touches the rule          |
+| Proposer disagrees with a rejection | re-propose after cooldown with amendments, never a direct merge                         |
 
 ## What is deliberately absent
 
