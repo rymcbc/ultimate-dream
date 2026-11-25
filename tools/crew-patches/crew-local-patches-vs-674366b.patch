@@ -1,0 +1,97 @@
+diff --git a/scripts/crew_card.py b/scripts/crew_card.py
+index 98f7fd6..8a0fe3e 100644
+--- a/scripts/crew_card.py
++++ b/scripts/crew_card.py
+@@ -1986,6 +1986,34 @@ def rework_fails(card_id):
+ PROOF_BLOCKED = 5       # `verdict` exit code: the safety floor refused the proof, nothing ran, no verdict line
+ 
+ 
++def _proof_cwd(card):
++    """The directory a proof runs in: the card's own workspace, so a verifier runs the proof where the work is.
++
++    None (the old behaviour: the caller's cwd) only when the card has no usable workspace path.
++    """
++    try:
++        db = kanban_db()
++        if not db:
++            return None
++        conn = sqlite3.connect("file:%s?mode=ro" % db, uri=True)
++        try:
++            row = conn.execute("select workspace_path from tasks where id=?", (card,)).fetchone()
++        finally:
++            conn.close()
++        path = row[0] if row else None
++        if path and os.path.isdir(path):
++            return path
++        # A scratch card has no workspace path: fall back to the board's default workdir (board.json next to
++        # the board DB), so every verifier still runs the proof in the project rather than in its own cwd.
++        import json as _json
++        meta = os.path.join(os.path.dirname(db), "board.json")
++        with open(meta, encoding="utf-8") as fh:
++            board_dir = (_json.load(fh) or {}).get("default_workdir") or ""
++        return board_dir if board_dir and os.path.isdir(board_dir) else None
++    except Exception:  # noqa: BLE001 - a lookup that fails must not stop the proof
++        return None
++
++
+ def run_verdict(card, by=None, timeout=300, no_hand_back=False, for_event=None):
+     """Run the card's owner-confirmed proof and record the verdict line: the one implementation behind the
+     `verdict` CLI subcommand and the crew_verdict tool. Returns a dict: `rc` (the CLI exit code: 0 PASS, 1 FAIL,
+@@ -2008,7 +2036,7 @@ def run_verdict(card, by=None, timeout=300, no_hand_back=False, for_event=None):
+         shown = ""
+     else:
+         t0 = time.time()
+-        run = crew_safety.run_proof(cmd, None, timeout, crew_safety.proof_mode(card, cmd), card=card)
++        run = crew_safety.run_proof(cmd, _proof_cwd(card), timeout, crew_safety.proof_mode(card, cmd), card=card)
+         if run.blocked:
+             res.update(rc=PROOF_BLOCKED, verdict="BLOCKED", blocked=run.blocked)
+             res["text"] = "\n".join(["verdict: BLOCKED - %s" % run.blocked] + notes + [
+diff --git a/scripts/crew_coordinator.py b/scripts/crew_coordinator.py
+index f3e4bb9..dadb12b 100644
+--- a/scripts/crew_coordinator.py
++++ b/scripts/crew_coordinator.py
+@@ -616,7 +616,14 @@ def apply_ask_owner(ctx, card, question, detail=""):
+ 
+ 
+ def apply_close(ctx, card, why):
+-    rc, out = kanban("complete", card["id"], "--summary", "coordinator close: %s" % why[:300])
++    summary = "coordinator close: %s" % why[:300]
++    rc, out = kanban("complete", card["id"], "--summary", summary)
++    if rc != 0 and "terminal state" in (out or ""):
++        # A card parked in triage (the loop raised an owner question, then the answer arrived) cannot be
++        # completed from that state. Move it back to a workable state, then close it with the same evidence;
++        # otherwise a card whose proof passed sits open forever and nothing is watching it.
++        kanban("specify", card["id"], "--author", "crew")
++        rc, out = kanban("complete", card["id"], "--summary", summary)
+     return rc == 0, ("closed: %s" % why[:120]) if rc == 0 else "complete failed: %s" % out[-160:]
+ 
+ 
+@@ -876,6 +883,11 @@ def audit_proof(ctx, card, event):
+         return {"action": "audit pass", "detail": dec["why"]}
+     kanban("comment", card["id"], "audit failed: the proof command exits %s after the card was completed.\n\n%s"
+            % (rc, out[-1200:]))
++    # A done card cannot be blocked or reopened, so write the audit verdict into its result: otherwise the board
++    # keeps showing a clean `done` for a card whose proof does not pass.
++    kanban("edit", card["id"], "--result",
++           "AUDIT FAIL: the proof command exits %s after completion (%s). Follow-up card carries the fix."
++           % (rc, " ".join(first.split())[:200]))
+     try:
+         if audit_followup_number(body) >= MAX_AUDIT_FOLLOWUPS:
+             # A done card can not be blocked and crew_notify alerts on blocked ones: the question rides on a follow-up
+diff --git a/scripts/crew_safety.py b/scripts/crew_safety.py
+index a31f2eb..b6080ea 100644
+--- a/scripts/crew_safety.py
++++ b/scripts/crew_safety.py
+@@ -296,8 +296,11 @@ def run_proof(cmd, cwd=None, timeout=300, mode="safe", card=None):
+                                "(install Git for Windows); the proof was not run", "")
+         argv = [bash, "-c", cmd]
+     try:
++        _win_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if IS_WINDOWS else 0
+         done = subprocess.run(argv, shell=not IS_WINDOWS, capture_output=True, text=True, timeout=timeout, cwd=cwd,
+-                              env=proof_env(), encoding="utf-8", errors="replace")
++                              env=proof_env(), encoding="utf-8", errors="replace",
++                              stdin=subprocess.DEVNULL, close_fds=True, start_new_session=True,
++                              creationflags=_win_flags)
+         return Result(done.returncode, (done.stdout or "") + (done.stderr or ""), "")
+     except subprocess.TimeoutExpired:
+         return Result(124, "proof command timed out after %ss" % timeout, "")
