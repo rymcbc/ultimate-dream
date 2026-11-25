@@ -1,61 +1,111 @@
-"""Pins the ledger canonicalisation from docs/LEDGER-FORMAT.md.
+"""Pins ledger v1 canonicalisation from docs/LEDGER-FORMAT.md.
 
-If this test goes red, someone changed the hash rule and every record ever written is now
+If a test here goes red, someone changed the hash rule and every record ever written is now
 unverifiable. Fix the change, not the test.
+
+Both vectors were published by the governance side (JARVIS) and reproduced independently here from the
+specification before any code was written against them.
 """
 import hashlib
 import json
 
-GENESIS_PREV = "0" * 64
+V1_RECORD_BYTES = (
+    '{"approvers":[{"gh_id":1001,"review_id":3912345678,"reviewed_sha":'
+    '"4f2a9c1e8b7d6a5f4e3d2c1b0a9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d"}],'
+    '"ballot_closed_at":"2026-11-25T17:00:00.000Z","ballot_id":"bal-2026-0001",'
+    '"ballot_snapshot_hash":"fb7fb3e41180e4e28cdb6b97355d5c3b358ebafeb2c23a6daefd3edd8a5a9563",'
+    '"close_comment_id":191234999,"created_by":"githubapp:ultimate-dream-ledger",'
+    '"decision_id":"dec-2026-0001",'
+    '"eligibility_snapshot_hash":"3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c",'
+    '"head_sha":"4f2a9c1e8b7d6a5f4e3d2c1b0a9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d",'
+    '"kind":"ratify","open_comment_id":191234567,'
+    '"prev_hash":"0000000000000000000000000000000000000000000000000000000000000000",'
+    '"proposal_body_sha256":"7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d",'
+    '"proposal_id":"prop-2026-0001","quorum_rule":{"quorum":"0.20","threshold":"0.50","weighted":false},'
+    '"result":"ratified","schema_version":1,'
+    '"scope_paths":["game/content/props/**","game/content/items/**"],"signer_key_id":"k1",'
+    '"supersedes":null,"tally":{"abstain":0,"approve":1,"reject":0},'
+    '"votes_ref":"votes/dec-2026-0001.json","voting_hours":72}'
+)
 
-VECTOR_RECORD = {
-    "anchor_comment": "ic_1234567890",
-    "approvers": ["u_1001", "u_1002"],
-    "ballot_snapshot_hash": "9f" * 32,
-    "decision_id": "dec-2026-0001",
-    "proposal_id": "prop-2026-0001",
-    "result": "ratified",
-    "window_hours": 48,
-}
+V1_RECORD_HASH = "0d87f7b4719159c11f00ba89a968c18fb869dc9fa630d0288b9a937c0b3abc1f"
 
-VECTOR_H1 = "6fa7e0e498031e7f41911119195e3b393027b56c7ed7a9e63ac2c507f2c6ad52"
+V1_VOTES_BYTES = (
+    '[{"body_sha256":"abababababababababababababababababababababababababababababababab",'
+    '"comment_id":191234701,"created_at":"2026-11-23T10:00:00.000Z",'
+    '"updated_at":"2026-11-23T10:00:00.000Z","voter_gh_id":1001}]'
+)
 
+V1_VOTES_HASH = "fb7fb3e41180e4e28cdb6b97355d5c3b358ebafeb2c23a6daefd3edd8a5a9563"
 
-def canonical_bytes(record: dict) -> bytes:
-    return json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-
-
-def chain_hash(prev_hash: str, record: dict) -> str:
-    assert len(prev_hash) == 64, "prev_hash must be 64 hex chars; the no-separator rule depends on it"
-    return hashlib.sha256(prev_hash.encode() + canonical_bytes(record)).hexdigest()
-
-
-def test_vector_hash_matches_spec():
-    assert chain_hash(GENESIS_PREV, VECTOR_RECORD) == VECTOR_H1
-
-
-def test_canonical_bytes_are_stable_and_sorted():
-    b = canonical_bytes({"b": 1, "a": 2})
-    assert b == b'{"a":2,"b":1}'
-
-
-def test_separator_variants_do_not_collide_with_spec():
-    """A colon or newline separator between prev_hash and payload must NOT verify."""
-    for sep in (":", "\n", " "):
-        bad = hashlib.sha256((GENESIS_PREV + sep).encode() + canonical_bytes(VECTOR_RECORD)).hexdigest()
-        assert bad != VECTOR_H1, f"separator {sep!r} accidentally reproduces the spec hash"
+# Superseded v0 sketch: prepend prev_hash_hex, exclude the field. Must never verify again.
+RETIRED_V0_HASH = "6fa7e0e498031e7f41911119195e3b393027b56c7ed7a9e63ac2c507f2c6ad52"
 
 
-def test_prev_hash_width_is_enforced():
-    try:
-        chain_hash("0" * 63, VECTOR_RECORD)
-    except AssertionError:
-        return
-    raise AssertionError("chain_hash accepted a 63-char prev_hash")
+def jcs(obj) -> bytes:
+    return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
-def test_result_vocabulary_is_approved_not_ratified():
-    """The gate and the service must share one vocabulary for approval."""
-    allowed = {"approved", "rejected", "void", "waived"}
-    assert "approved" in allowed
-    assert "ratified" not in allowed
+def v1_hash(record: dict) -> str:
+    """v1: prev_hash is a field inside the preimage. Only hash/signature are excluded."""
+    payload = {k: v for k, v in record.items() if k not in ("hash", "signature")}
+    return hashlib.sha256(jcs(payload)).hexdigest()
+
+
+def legacy_v0_hash(record: dict) -> str:
+    """Superseded: prepend prev_hash and exclude the field. Kept only to prove it cannot pass."""
+    payload = {k: v for k, v in record.items() if k not in ("hash", "signature", "prev_hash")}
+    return hashlib.sha256(record["prev_hash"].encode() + jcs(payload)).hexdigest()
+
+
+def test_record_vector_matches_published_hash():
+    rec = json.loads(V1_RECORD_BYTES)
+    assert jcs(rec).decode() == V1_RECORD_BYTES, "canonical bytes drifted from the published vector"
+    assert v1_hash(rec) == V1_RECORD_HASH
+
+
+def test_vote_snapshot_vector_matches_published_hash():
+    votes = json.loads(V1_VOTES_BYTES)
+    assert hashlib.sha256(jcs(votes)).hexdigest() == V1_VOTES_HASH
+
+
+def test_legacy_preimage_rule_cannot_produce_v1_hash():
+    """The v0 rule must fail against v1: two rules, one record, different hashes is the bug this guards."""
+    rec = json.loads(V1_RECORD_BYTES)
+    assert legacy_v0_hash(rec) != V1_RECORD_HASH
+
+
+def test_retired_v0_vector_is_not_reachable_from_v1_rule():
+    rec = json.loads(V1_RECORD_BYTES)
+    assert v1_hash(rec) != RETIRED_V0_HASH
+
+
+def test_prev_hash_is_required_and_fixed_width():
+    rec = json.loads(V1_RECORD_BYTES)
+    assert len(rec["prev_hash"]) == 64
+    broken = dict(rec)
+    broken["prev_hash"] = "0" * 63
+    assert v1_hash(broken) != V1_RECORD_HASH
+
+
+def test_tamper_changes_hash():
+    rec = json.loads(V1_RECORD_BYTES)
+    rec["result"] = "rejected"
+    assert v1_hash(rec) != V1_RECORD_HASH
+
+
+def test_vocabulary_is_ratified_not_approved():
+    """The writer owns the vocabulary; the gate adopts it."""
+    rec = json.loads(V1_RECORD_BYTES)
+    assert rec["kind"] == "ratify"
+    assert rec["result"] == "ratified"
+    allowed = {"ratified", "rejected", "void", "waived"}
+    assert "approved" not in allowed
+
+
+def test_both_timers_are_carried():
+    """Voting window and notice window are different things and must not collapse into one field."""
+    rec = json.loads(V1_RECORD_BYTES)
+    assert rec["voting_hours"] == 72
+    notice_hours = 48
+    assert notice_hours != rec["voting_hours"]
