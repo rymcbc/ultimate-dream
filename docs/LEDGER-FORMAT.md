@@ -42,7 +42,10 @@ audit ends up with a decision that was legitimately approved and cannot be prove
 | `schema_version` | int | 1 |
 | `decision_id`, `proposal_id`, `ballot_id` | str | stable ids, not issue numbers |
 | `open_comment_id`, `close_comment_id` | int | GitHub-stamped comments; the close comment's `created_at` is the only permitted window anchor |
-| `voting_hours` | int | **vote window**, written at open so `closes_at` is derivable, never declared |
+| `voting_hours` | int | **the single window**: 48 in production. Written at open so `closes_at` is derivable, never declared |
+| `owner_notified_at` | int \| null | when the owner was DM'd at T0 (audit only, never a gate input) |
+| `owner_decision` | `none` \| `reviewed` \| `override` | silence is `none` and the ballot proceeds |
+| `owner_override_ground` | str \| null | required when `owner_decision` is `override`; one of legal \| safety \| security \| build |
 | `ballot_closed_at` | ISO8601 Z | must equal `close_comment.created_at` exactly |
 | `votes_ref` | path | e.g. `votes/dec-2026-0001.json` |
 | `ballot_snapshot_hash` | hex | `sha256(JCS(votes array))`, frozen at close |
@@ -59,20 +62,24 @@ audit ends up with a decision that was legitimately approved and cannot be prove
 | `supersedes` | id \| null | append-only correction, never an edit |
 | `created_by` | str | writer identity, e.g. `githubapp:ultimate-dream-ledger` |
 
-## Two timers — do not merge them
+## One window: 48 hours (owner ruling, 2026-11-25)
 
-- **Vote window** (`voting_hours`): how long the ballot stays open for voting.
-- **Notice window** (`window_hours`, 48): the ratification gap between ballot close and merge. Ryan's
-  requirement — "passed, then a 2-day timer, then it goes in the game" — is *this* one.
+There is **one** timer. It is the vote window *and* the notice period, and it is 48 hours:
 
-A record carrying only one of them cannot distinguish "voted for two days" from "approved and merged
-instantly", which is precisely the failure the project exists to prevent. The gate enforces:
+- `voting_hours: 48`, written at open so `closes_at` is derivable, never declared.
+- Everyone eligible is notified at T0 and has the full window to object.
+- The merge may follow immediately after close. There is **no second waiting period** — an earlier draft in this
+  document required `merge_time - close >= 48h`, and that is hereby withdrawn.
+
+Gate rule instead:
 
 ```
-merge_commit_committer_date - ballot_closed_at >= 48h
+close_comment.created_at - open_comment.created_at == 48h   (GitHub-stamped, both of them)
+merge is allowed any time after close
 ```
 
-GitHub **committer** timestamps only. Author dates are chosen by the contributor and are trivially backdated.
+GitHub **committer** timestamps only; author dates are chosen by the contributor and are trivially backdated.
+`window_hours` is removed rather than left in place meaning nothing.
 
 ## Test vectors (normative)
 
@@ -121,6 +128,8 @@ Records are append-only; a wrong record is superseded, and the old one stays for
 - `schema_version` stayed `1` while the preimage rule changed from the sketch. The sketch is recorded here as
   superseded; a bump to `2` is pending the writer's decision, so no two records claim the same version under
   different rules.
-- `voting_hours: 72` — sample value or decision, pending confirmation.
+- `voting_hours` — **resolved 2026-11-25 by the owner: 48 hours, one window.** The value `72` in the published
+  vector stays as-is: the vector tests the hash rule, not policy, and editing it would invalidate a hash that was
+  agreed by two parties. Production records carry 48.
 - Ed25519 signature verification (over the 64 raw hash bytes) and the `LEDGER_HEAD` anchor are specified but
   not yet wired.

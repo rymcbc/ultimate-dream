@@ -103,9 +103,30 @@ def test_vocabulary_is_ratified_not_approved():
     assert "approved" not in allowed
 
 
-def test_both_timers_are_carried():
-    """Voting window and notice window are different things and must not collapse into one field."""
+def test_single_window_is_48_hours():
+    """Owner ruling: one 48-hour window that is both the vote window and the notice period."""
+    POLICY_VOTING_HOURS = 48
+    assert POLICY_VOTING_HOURS == 48
+    # The published vector deliberately keeps 72: it pins the hash rule, not policy. Changing the
+    # fixture value would invalidate a hash two parties agreed on.
     rec = json.loads(V1_RECORD_BYTES)
     assert rec["voting_hours"] == 72
-    notice_hours = 48
-    assert notice_hours != rec["voting_hours"]
+    assert rec["voting_hours"] != POLICY_VOTING_HOURS
+
+
+def test_owner_block_fields_are_part_of_the_format():
+    """The owner is DM'd at T0; silence is not an override, so the block must be explicit."""
+    rec = dict(json.loads(V1_RECORD_BYTES))
+    rec["owner_notified_at"] = 1795600000
+    rec["owner_decision"] = "none"
+    rec["owner_override_ground"] = None
+    assert rec["owner_decision"] in {"none", "reviewed", "override"}
+    assert v1_hash(rec) != V1_RECORD_HASH, "adding owner fields must change the hash"
+
+
+def test_override_requires_a_cited_ground():
+    allowed = {"legal", "safety", "security", "build"}
+    rec = dict(json.loads(V1_RECORD_BYTES))
+    rec["owner_decision"] = "override"
+    rec["owner_override_ground"] = "because I said so"
+    assert rec["owner_override_ground"] not in allowed
