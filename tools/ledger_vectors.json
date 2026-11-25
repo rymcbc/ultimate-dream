@@ -1,10 +1,17 @@
 {
-  "spec": "ledger-hash-chain-v1",
+  "spec": "ledger-hash-chain-v2",
+  "status": "SUPERSEDES ledger-hash-chain-v1. The v1 prefix-rule hashes pinned earlier (6fa7e0e4..., 81a905ef...) do NOT reproduce under this rule and are void.",
   "genesis_prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
-  "hash_construction": "sha256(prev_hash_hex + canonical_json(record)).hexdigest()",
+  "hash_construction": "sha256(canonical_json(record minus hash and signature)); prev_hash is an ordinary field inside the preimage",
   "canonical_json": "json.dumps(record, sort_keys=True, separators=(',',':'), ensure_ascii=False).encode('utf-8')",
-  "excluded_from_preimage": ["hash", "signature", "prev_hash"],
-  "notes": "Vectors supplied by the governance side (JARVIS) and independently reproduced by the gate side. Any implementation that disagrees on either hash or on the canonical bytes must raise before scaffold lands.",
+  "excluded_from_preimage": ["hash", "signature"],
+  "signature": "Ed25519 over the 64 raw bytes of hash; public key published base64 raw (32 bytes)",
+  "fixture_signer": {
+    "key_id": "ledger-fixture-1",
+    "public_key_b64": "ecm4OdusY9aim3ImOTSzAqTYkXYTuWWmGhXDz9GsbJc=",
+    "private_key_hex_TEST_ONLY_DO_NOT_USE": "99b0b9321560771b693f61b5fc836b62445b1ca31885a1871a96349bd5227211",
+    "note": "Fixture key exists only so CI exercises the signature path. The service must never sign with it."
+  },
   "cases": [
     {
       "name": "genesis-ratified",
@@ -15,10 +22,13 @@
         "decision_id": "dec-2026-0001",
         "proposal_id": "prop-2026-0001",
         "result": "ratified",
+        "signer_key_id": "ledger-fixture-1",
+        "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
         "window_hours": 48
       },
-      "canonical_bytes": "{\"anchor_comment\":\"ic_1234567890\",\"approvers\":[\"u_1001\",\"u_1002\"],\"ballot_snapshot_hash\":\"9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f\",\"decision_id\":\"dec-2026-0001\",\"proposal_id\":\"prop-2026-0001\",\"result\":\"ratified\",\"window_hours\":48}",
-      "hash": "6fa7e0e498031e7f41911119195e3b393027b56c7ed7a9e63ac2c507f2c6ad52"
+      "canonical_bytes": "{\"anchor_comment\":\"ic_1234567890\",\"approvers\":[\"u_1001\",\"u_1002\"],\"ballot_snapshot_hash\":\"9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f\",\"decision_id\":\"dec-2026-0001\",\"prev_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"proposal_id\":\"prop-2026-0001\",\"result\":\"ratified\",\"signer_key_id\":\"ledger-fixture-1\",\"window_hours\":48}",
+      "hash": "40da751abc728eb84d771e9409c76611115d964dd27c38fbf15ff8b39a8c1c2c",
+      "signature": "zcVW3xOwlDohbBfLfsaNlLe6cCeZaXnW8Gwk2cQ1MZiHixuqDlUi0ryI6t76X2ZjLhbfJV9zf3sqwQLk1ImpAw=="
     },
     {
       "name": "chain-2-rejected",
@@ -29,10 +39,13 @@
         "decision_id": "dec-2026-0002",
         "proposal_id": "prop-2026-0002",
         "result": "rejected",
+        "signer_key_id": "ledger-fixture-1",
+        "prev_hash": "40da751abc728eb84d771e9409c76611115d964dd27c38fbf15ff8b39a8c1c2c",
         "window_hours": 48
       },
-      "canonical_bytes": "{\"anchor_comment\":\"ic_1234567891\",\"approvers\":[\"u_1001\"],\"ballot_snapshot_hash\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"decision_id\":\"dec-2026-0002\",\"proposal_id\":\"prop-2026-0002\",\"result\":\"rejected\",\"window_hours\":48}",
-      "hash": "81a905ef14a8867beb4c390cb113633f7ac0ae141f73a7e6b6e45b8e063bc40c"
+      "canonical_bytes": "{\"anchor_comment\":\"ic_1234567891\",\"approvers\":[\"u_1001\"],\"ballot_snapshot_hash\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"decision_id\":\"dec-2026-0002\",\"prev_hash\":\"40da751abc728eb84d771e9409c76611115d964dd27c38fbf15ff8b39a8c1c2c\",\"proposal_id\":\"prop-2026-0002\",\"result\":\"rejected\",\"signer_key_id\":\"ledger-fixture-1\",\"window_hours\":48}",
+      "hash": "c468805a93a7f23eaa7ab088178fe5bdd713f3ea6ff24b18c050f407c13cd121",
+      "signature": "lYqksrTkiFXSyJF5M6TUuUtTVcFwR4R263UEFd4fuQir1jn3oeS22n46EWdVAeI8yxnr+yeGHDJHGT23ZiTkDQ=="
     }
   ]
 }
