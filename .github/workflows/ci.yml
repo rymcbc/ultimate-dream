@@ -33,7 +33,7 @@ jobs:
         run: npx prettier --check "**/*.{md,yaml,yml,json}" "!node_modules/**"
 
       - name: Markdownlint
-        run: npx markdownlint "**/*.md" "!node_modules/**" --config .markdownlintrc.json
+        run: npx markdownlint --ignore node_modules --config .markdownlintrc.json "**/*.md"
 
       - name: YAML lint (GitHub Actions workflows)
         run: |
