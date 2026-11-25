@@ -1,0 +1,78 @@
+name: Bug Report
+description: Report a reproducible issue in the codebase, assets, or tooling
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "Thanks for reporting a bug! Please be specific — vague reports waste everyone's time."
+  - type: input
+    id: summary
+    attributes:
+      label: One-line summary
+      placeholder: "Player falls through floor in level 3 when crouching"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Gameplay / Logic
+        - Rendering / Visuals
+        - Audio
+        - Networking / Multiplayer
+        - Tools / Pipeline
+        - CI / Infrastructure
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce (numbered, minimal)
+      description: Exact steps from a clean checkout. Include commit hash if not main.
+      placeholder: "1. git clone ... && cd ultimate-dream\n2. Run ./tools/build.sh\n3. Launch game, start New Game\n4. Walk to level 3, press Ctrl to crouch\n5. Player clips through floor"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behaviour
+      placeholder: "Player should collide with floor while crouching"
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behaviour
+      placeholder: "Player falls into void, camera detaches, console spam: 'NaN position'"
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Commit / Build Hash
+      description: git rev-parse HEAD or CI build number
+      placeholder: "a1b2c3d4 / CI #42"
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Screenshots / Video
+      description: Drag & drop or paste links. Trim to the relevant section.
+    validations:
+      required: false
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: "I searched existing issues and found no duplicate."
+          required: true
+        - label: "I can reproduce this on a clean checkout of main."
+          required: true
+        - label: "This is not a feature request or proposal (use the Proposal template instead)."
+          required: true

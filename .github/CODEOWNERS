@@ -1,0 +1,35 @@
+# CODEOWNERS for Ultimate Dream
+# These users/teams are requested for review when files in their paths change.
+# Syntax: path @user-or-team
+# Order matters: last match wins.
+
+# Global fallback — all PRs need 2 reviews from any code owner
+* @rymcbc
+
+# Game code — core gameplay, systems, engine integration
+/game/ @rymcbc
+
+# Art pipeline, shaders, material libraries, asset specs
+/art/ @rymcbc
+
+# Build tools, validators, asset checkers, fixture generators
+/tools/ @rymcbc
+
+# Documentation, governance, decisions, contributing guides
+/docs/ @rymcbc
+
+# Asset folders — each must carry LICENSE.txt (enforced by CI)
+/assets/ @rymcbc
+
+# CI/CD workflows and GitHub Actions
+/.github/workflows/ @rymcbc
+
+# Issue templates and PR template
+/.github/ISSUE_TEMPLATE/ @rymcbc
+/.github/pull_request_template.md @rymcbc
+
+# Constitution and root governance docs
+/CONSTITUTION.md @rymcbc
+/GOVERNANCE.md @rymcbc
+/CONTRIBUTING.md @rymcbc
+/ROADMAP.md @rymcbc

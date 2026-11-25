@@ -1,0 +1,74 @@
+# Ultimate Dream .gitignore
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+*swo
+*~
+.vscode/
+.idea/
+*.vscode-settings.json
+
+# Build outputs (engine-agnostic)
+build/
+dist/
+out/
+bin/
+obj/
+
+# Node / npm
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-store/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+.env
+
+# Rust
+target/
+Cargo.lock
+
+# Godot (when chosen)
+.import/
+export_presets.cfg
+*.translation
+*.tscn.bak
+*.scn.bak
+
+# Unreal (when chosen)
+/Intermediate/
+/Build/
+/DerivedDataCache/
+*.sln
+*.vcxproj*
+*.uproject
+*.uasset
+*.umap
+
+# Unity (when chosen)
+/Library/
+/Temp/
+/Obj/
+/Logs/
+/UserSettings/
+*.csproj
+*.sln
+
+# LFS pointers (actual large files stored in LFS)
+*.lfs
+
+# IDE / OS specifics
+*.swp
+*.swo
+*~

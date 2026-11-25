@@ -1,0 +1,38 @@
+{
+  "spec": "ledger-hash-chain-v1",
+  "genesis_prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "hash_construction": "sha256(prev_hash_hex + canonical_json(record)).hexdigest()",
+  "canonical_json": "json.dumps(record, sort_keys=True, separators=(',',':'), ensure_ascii=False).encode('utf-8')",
+  "excluded_from_preimage": ["hash", "signature", "prev_hash"],
+  "notes": "Vectors supplied by the governance side (JARVIS) and independently reproduced by the gate side. Any implementation that disagrees on either hash or on the canonical bytes must raise before scaffold lands.",
+  "cases": [
+    {
+      "name": "genesis-ratified",
+      "record": {
+        "anchor_comment": "ic_1234567890",
+        "approvers": ["u_1001", "u_1002"],
+        "ballot_snapshot_hash": "9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f",
+        "decision_id": "dec-2026-0001",
+        "proposal_id": "prop-2026-0001",
+        "result": "ratified",
+        "window_hours": 48
+      },
+      "canonical_bytes": "{\"anchor_comment\":\"ic_1234567890\",\"approvers\":[\"u_1001\",\"u_1002\"],\"ballot_snapshot_hash\":\"9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f\",\"decision_id\":\"dec-2026-0001\",\"proposal_id\":\"prop-2026-0001\",\"result\":\"ratified\",\"window_hours\":48}",
+      "hash": "6fa7e0e498031e7f41911119195e3b393027b56c7ed7a9e63ac2c507f2c6ad52"
+    },
+    {
+      "name": "chain-2-rejected",
+      "record": {
+        "anchor_comment": "ic_1234567891",
+        "approvers": ["u_1001"],
+        "ballot_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "decision_id": "dec-2026-0002",
+        "proposal_id": "prop-2026-0002",
+        "result": "rejected",
+        "window_hours": 48
+      },
+      "canonical_bytes": "{\"anchor_comment\":\"ic_1234567891\",\"approvers\":[\"u_1001\"],\"ballot_snapshot_hash\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"decision_id\":\"dec-2026-0002\",\"proposal_id\":\"prop-2026-0002\",\"result\":\"rejected\",\"window_hours\":48}",
+      "hash": "81a905ef14a8867beb4c390cb113633f7ac0ae141f73a7e6b6e45b8e063bc40c"
+    }
+  ]
+}

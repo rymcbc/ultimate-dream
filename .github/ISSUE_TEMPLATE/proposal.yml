@@ -1,0 +1,74 @@
+name: Proposal
+description: Submit a new direction, feature, or policy proposal for the project
+title: "[Proposal] "
+labels: ["proposal"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing something! Please fill out every field. Incomplete proposals will be closed.
+  - type: input
+    id: title
+    attributes:
+      label: One-line title
+      placeholder: "Switch to Godot 4.4 / Add VR support / Adopt Apache-2.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - Engine / Tech Stack
+        - Gameplay / Design
+        - Art / Audio Pipeline
+        - Governance / Process
+        - Licensing / Legal
+        - Infrastructure / CI
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: pitch
+    attributes:
+      label: The Pitch (2–3 sentences)
+      description: What are you proposing and why does it matter?
+      placeholder: "We should switch to Godot because..."
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why Now?
+      description: What problem does this solve? What happens if we don't do it?
+      placeholder: "Current engine limits..."
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope & Impact
+      description: What files, systems, or policies change? Estimated effort? Breaking changes?
+      placeholder: "Affects game/, tools/, CI. ~3 weeks. Breaks save format."
+    validations:
+      required: true
+  - type: textarea
+    id: assets
+    attributes:
+      label: Asset Implications
+      description: New assets needed? License constraints? LFS requirements?
+      placeholder: "Need 50 MB of CC0 textures — will use LFS. All CC0."
+    validations:
+      required: false
+  - type: checkboxes
+    id: license_declaration
+    attributes:
+      label: License Declaration
+      description: You must confirm the following for any assets or code you contribute.
+      options:
+        - label: "I confirm that any assets I contribute under this proposal carry a LICENSE.txt in their folder and comply with the project's asset policy (CONSTITUTION.md Article IV)."
+          required: true
+        - label: "I confirm that any code I contribute is offered under the project's current license (MIT placeholder, subject to ballot)."
+          required: true
+        - label: "I understand this proposal may be balloted per CONSTITUTION.md Article VI."
+          required: true

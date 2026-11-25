@@ -1,0 +1,20 @@
+{
+  "name": "ultimate-dream",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Ultimate Dream - collaborative game project",
+  "scripts": {
+    "lint": "prettier --check \"**/*.{md,yaml,yml,json}\" && markdownlint \"**/*.md\" --config .markdownlintrc.json",
+    "format": "prettier --write \"**/*.{md,yaml,yml,json}\""
+  },
+  "devDependencies": {
+    "prettier": "^3.2.5",
+    "markdownlint-cli": "^0.41.0",
+    "@commitlint/cli": "^19.0.3",
+    "@commitlint/config-conventional": "^19.0.3",
+    "yaml-lint": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

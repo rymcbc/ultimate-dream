@@ -1,0 +1,46 @@
+name: Ledger Verify
+
+on:
+  push:
+    branches: [main, ledger]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  ledger-verify:
+    name: Hash Chain Vectors + Ledger Chain
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Canonical form and hash construction match the pinned vectors
+        run: python3 tools/ledger_verify.py --self-test
+
+      - name: Verify the published ledger chain (if the ledger branch exists)
+        run: |
+          if git fetch --depth=1 origin ledger:refs/remotes/origin/ledger 2>/dev/null; then
+            if git cat-file -e origin/ledger:LATEST.jsonl 2>/dev/null; then
+              git show origin/ledger:LATEST.jsonl > "$RUNNER_TEMP/ledger.jsonl"
+              python3 tools/ledger_verify.py "$RUNNER_TEMP/ledger.jsonl"
+            else
+              echo "ledger branch present but no LATEST.jsonl yet - pre-genesis"
+            fi
+          else
+            echo "no ledger branch yet - pre-genesis"
+          fi
+
+concurrency:
+  group: ledger-verify-${{ github.ref }}
+  cancel-in-progress: true

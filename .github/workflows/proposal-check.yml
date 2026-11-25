@@ -1,0 +1,48 @@
+name: Proposal Check
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  proposal-check:
+    name: Verify Approved-Proposal Reference
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check PR description for Approved-Proposal
+        id: check
+        run: |
+          BODY="${{ github.event.pull_request.body }}"
+          if echo "$BODY" | grep -qi "Approved-Proposal: UD-[0-9]\+"; then
+            echo "found=true" >> $GITHUB_OUTPUT
+            echo "✓ Found valid Approved-Proposal reference"
+            echo "$BODY" | grep -i "Approved-Proposal:"
+          else
+            echo "found=false" >> $GITHUB_OUTPUT
+            echo "✗ PR description must contain 'Approved-Proposal: UD-###' (e.g., UD-001)"
+            exit 1
+          fi
+
+      - name: Verify proposal exists in DECISIONS/
+        if: steps.check.outputs.found == 'true'
+        run: |
+          BODY="${{ github.event.pull_request.body }}"
+          PROPOSAL_NUM=$(echo "$BODY" | grep -i "Approved-Proposal:" | sed -E 's/.*UD-([0-9]+).*/\1/')
+          PROPOSAL_FILE="DECISIONS/UD-${PROPOSAL_NUM}.md"
+          if [ -f "$PROPOSAL_FILE" ]; then
+            echo "✓ Proposal file exists: $PROPOSAL_FILE"
+          else
+            echo "✗ Proposal file not found: $PROPOSAL_FILE"
+            echo "Passed proposals must be recorded in DECISIONS/UD-###.md"
+            exit 1
+          fi
