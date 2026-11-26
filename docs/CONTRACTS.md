@@ -107,8 +107,11 @@ result                  ratified | rejected | void
 Branch `ledger`, orphan, append-only, never merged to `main`: `ledger.jsonl`, `votes/<decision_id>.json`,
 `keys/ledger-<k>.pub`. CI reads the tip of `ledger`; `main` never contains it.
 
-- Format: [`LEDGER-FORMAT.md`](LEDGER-FORMAT.md) is normative. Current version **v2**, vector hash
-  `5451538b45503c04b7d8b5e939628c3f7aee4c43735d22d6dca673146e2932a4`.
+- Format: [`LEDGER-FORMAT.md`](LEDGER-FORMAT.md) is normative. Current version **v3**, vector hash
+  `843665b13896c04e4acb3a386d149f6f5899943000414862a19cedf360bb63dc`. The hash above is
+  `sha256` of the canonical vector line in `LEDGER-FORMAT.md` with its newline stripped — the document
+  proves itself, and the gate's suite re-derives it on every run. Retired shapes (`v0`, `v1`, `v2`) are
+  pinned as must-fail; `v2`'s hash `5451538b…` is expected to fail and must never be treated as current.
 - Hash: `sha256(canonical_json(record minus hash and signature))`, `prev_hash` an ordinary field inside the
   preimage, genesis `prev_hash` = 64 zeros. Ed25519 signature over the 64 raw hash bytes.
 - Immutable: corrections append a record carrying `supersedes`; the gate **folds** the chain (last record wins along
