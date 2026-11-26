@@ -1,5 +1,10 @@
 # Roadmap
 
+> **Hand-written during bootstrap.** `docs/CONTRIBUTING.md` promises this file is generated from approved
+> proposals; the ballot engine that would do that is in build. Until the first `DECISIONS/UD-###.md` exists this
+> file is maintained by hand and is the only place phase promises live. The moment generation is live, this note
+> and the hand-editing both stop.
+
 ## Phase 0: Scaffold (Current)
 
 - [x] Repository initialised with MIT placeholder license
@@ -7,6 +12,7 @@
 - [x] GitHub templates, CODEOWNERS, CI workflows
 - [x] Branch protection (pending `gh` config)
 - [x] Asset gates (license + size) in CI
+- [x] Ledger format v2, offline verifier, ledger writer (22 tests)
 - [ ] License ballot (trigger: 10 contributors or 6 months)
 
 ## Phase 1: Engine Ballot
