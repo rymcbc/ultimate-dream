@@ -27,7 +27,6 @@ import json
 import sqlite3
 from datetime import datetime, timezone
 from decimal import Decimal
-from math import ceil
 from typing import Any
 
 
@@ -235,10 +234,13 @@ def required_quorum(eligible_count: int) -> int:
 
     Below five eligible members, quorum is every eligible voter — otherwise a
     founding ballot is void by construction and can never be re-run into a pass.
+    Integer arithmetic only: 0.20 * n in binary float drifts (0.20 * 1_000_000
+    is 200000.00000000003, whose ceil is 200001), and this number shapes the
+    record's quorum_met, so it cannot be approximate.
     """
     if eligible_count < 5:
         return eligible_count
-    return min(eligible_count, max(5, ceil(0.20 * eligible_count)))
+    return min(eligible_count, max(5, (eligible_count * 20 + 99) // 100))
 
 
 def normalize_vote(
@@ -296,14 +298,16 @@ def latest_per_voter(votes: list) -> list:
 
 def validate_window(opens_at: str, closes_at: str, voting_hours: int = VOTING_HOURS) -> None:
     """closes_at - opens_at must equal voting_hours, both GitHub-stamped.
-    Never a local clock."""
+    Never a local clock. Compared in integer seconds so no float can drift the
+    window: 48h is exactly 172800s, not 47.999999h."""
     open_dt = datetime.fromisoformat(opens_at.replace("Z", "+00:00"))
     close_dt = datetime.fromisoformat(closes_at.replace("Z", "+00:00"))
-    delta_hours = (close_dt - open_dt).total_seconds() / 3600.0
-    if delta_hours != float(voting_hours):
+    delta_seconds = int((close_dt - open_dt).total_seconds())
+    expected = voting_hours * 3600
+    if delta_seconds != expected:
         raise WindowError(
-            f"window is {delta_hours}h, must be exactly {voting_hours}h "
-            f"(close - open, GitHub-stamped)"
+            f"window is {delta_seconds}s, must be exactly {expected}s "
+            f"({voting_hours}h, close - open, GitHub-stamped)"
         )
 
 

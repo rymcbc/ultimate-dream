@@ -26,6 +26,7 @@ from service.ballot_engine import (  # noqa: E402
     latest_per_voter,
     next_ballot_id,
     next_proposal_id,
+    required_quorum,
     normalize_vote,
     snapshot_hash,
     validate_window,
@@ -468,6 +469,18 @@ def test_open_refuses_weighted():
     except BallotError:
         return
     raise AssertionError("weighted=true must be refused at open, not ignored")
+
+
+def test_required_quorum_is_exact_at_scale():
+    """20% is integer arithmetic, not a float multiply: 0.20 * 1_000_000 in
+    binary float is 200000.00000000003, whose ceil is 200001."""
+    assert required_quorum(1_000_000) == 200_000
+    assert required_quorum(100) == 20
+    assert required_quorum(26) == 6
+    assert required_quorum(25) == 5
+    assert required_quorum(5) == 5
+    assert required_quorum(4) == 4  # below five, every eligible voter
+    assert required_quorum(0) == 0
 
 
 # --------------------------------------------------------------------------
