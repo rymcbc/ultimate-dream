@@ -1,0 +1,39 @@
+{
+  "_note": "Provider endpoints for tools/free_model_watch.py. Keys are read from the environment / .env by env_var — never stored here. Both machines run this same file, so a provider is added once.",
+  "providers": [
+    {
+      "name": "nvidia-nim",
+      "base_url": "https://integrate.api.nvidia.com/v1",
+      "env_var": "NVIDIA_API_KEY"
+    },
+    {
+      "name": "kilo-gateway",
+      "base_url": "https://ai-gateway.kilo.ai/api/v1",
+      "env_var": "KILO_API_KEY"
+    },
+    {
+      "name": "orca-router",
+      "base_url": "https://api.orcarouter.ai/v1",
+      "env_var": "ORCA_API_KEY"
+    },
+    {
+      "name": "nous-proxy",
+      "base_url": "http://127.0.0.1:8645/v1",
+      "env_var": null
+    },
+    {
+      "name": "openrouter",
+      "base_url": "https://openrouter.ai/api/v1",
+      "env_var": "OPENROUTER_API_KEY"
+    },
+    {
+      "name": "google-ai",
+      "base_url": "https://generativelanguage.googleapis.com/v1beta",
+      "env_var": "GOOGLE_AI_API_KEY",
+      "models_style": "gemini",
+      "models_path": "/models?pageSize=50",
+      "chat_path": "/openai/chat/completions",
+      "probe_extra": { "reasoning_effort": "low" }
+    }
+  ]
+}
