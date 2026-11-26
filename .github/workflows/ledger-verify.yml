@@ -10,8 +10,8 @@ permissions:
   contents: read
 
 jobs:
-  ledger-verify:
-    name: Hash Chain Vectors + Ledger Chain
+  ledger-vectors:
+    name: Canonical Form + Hash Vectors
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -25,21 +25,51 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Canonical form and hash construction match the pinned vectors
-        run: python3 tools/ledger_verify.py --self-test
+      - name: Install signature dependency
+        run: python -m pip install --quiet cryptography
 
-      - name: Verify the published ledger chain (if the ledger branch exists)
+      - name: Pinned vectors (canonical bytes, hashes, signatures, tamper refusal)
+        run: python tools/ledger_verify.py --self-test
+
+  ledger-chain:
+    name: Ledger Branch Chain
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install signature dependency
+        run: python -m pip install --quiet cryptography
+
+      - name: Verify the published ledger chain
         run: |
-          if git fetch --depth=1 origin ledger:refs/remotes/origin/ledger 2>/dev/null; then
-            if git cat-file -e origin/ledger:LATEST.jsonl 2>/dev/null; then
-              git show origin/ledger:LATEST.jsonl > "$RUNNER_TEMP/ledger.jsonl"
-              python3 tools/ledger_verify.py "$RUNNER_TEMP/ledger.jsonl"
-            else
-              echo "ledger branch present but no LATEST.jsonl yet - pre-genesis"
-            fi
-          else
-            echo "no ledger branch yet - pre-genesis"
+          set -euo pipefail
+          if ! git fetch --depth=1 origin ledger:refs/remotes/origin/ledger 2>/dev/null; then
+            echo "no ledger branch yet - pre-genesis, nothing to verify"
+            exit 0
           fi
+          mkdir -p "$RUNNER_TEMP/ledger"
+          git archive origin/ledger | tar -x -C "$RUNNER_TEMP/ledger"
+          if [ ! -f "$RUNNER_TEMP/ledger/ledger.jsonl" ]; then
+            echo "::error::ledger branch exists but has no ledger.jsonl"
+            exit 1
+          fi
+          if ! grep -qvE '^[[:space:]]*(#|$)' .github/ledger-trusted-keys.txt; then
+            echo "::error::ledger-trusted-keys.txt lists no keys - every signer would be unverifiable. Register the service key id on main first."
+            exit 1
+          fi
+          python tools/ledger_verify.py \
+            --keys-dir "$RUNNER_TEMP/ledger/keys" \
+            --trusted-keys .github/ledger-trusted-keys.txt \
+            "$RUNNER_TEMP/ledger/ledger.jsonl"
 
 concurrency:
   group: ledger-verify-${{ github.ref }}

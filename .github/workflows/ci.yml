@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   lint-and-test:
-    name: Lint + Tests + Boot Smoke
+    name: ci
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -23,18 +23,17 @@ jobs:
       - name: Setup Node (for prettier, markdownlint)
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
 
       - name: Install lint tools
         run: |
           npm ci 2>/dev/null || npm install --save-dev prettier markdownlint-cli @commitlint/cli @commitlint/config-conventional
 
       - name: Prettier (markdown, yaml, json)
-        run: npx prettier --check "**/*.{md,yaml,yml,json}"
+        run: npx prettier --check "**/*.{md,yaml,yml,json}" "!node_modules/**"
 
       - name: Markdownlint
-        run: npx markdownlint "**/*.md" --config .markdownlintrc.json
+        run: npx markdownlint --ignore node_modules --config .markdownlintrc.json "**/*.md"
 
       - name: YAML lint (GitHub Actions workflows)
         run: |
@@ -42,15 +41,15 @@ jobs:
 
       - name: DCO check (signed commits)
         run: |
-          ./tools/check_dco.sh ${{ github.event.pull_request.head.sha || github.sha }}
+          bash tools/check_dco.sh ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Asset license gate
         run: |
-          ./tools/check_asset_licenses.sh
+          bash tools/check_asset_licenses.sh
 
       - name: Size gate (20 MB file / 5 MB binary without LFS)
         run: |
-          ./tools/check_file_sizes.sh
+          bash tools/check_file_sizes.sh
 
       - name: Headless boot smoke (placeholder)
         run: |
@@ -58,20 +57,6 @@ jobs:
           echo "No engine selected yet — ballot open."
           echo "This step will run the engine's headless test suite when an engine is chosen."
           echo "For now: PASS (placeholder)"
-
-  proposal-check:
-    name: Proposal Check
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Verify PR references approved proposal
-        run: |
-          ./tools/check_proposal_ref.sh "${{ github.event.pull_request.body || '' }}"
 
 concurrency:
   group: ci-${{ github.ref }}

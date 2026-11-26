@@ -1,49 +1,119 @@
-# Constitution of the Ultimate Dream Project
+# Constitution of the Ultimate Dream
 
-## Preamble
-We, the contributors to Ultimate Dream, establish this Constitution to govern our collaboration, protect contributor rights, and ensure the project remains open, playable, and community-directed.
+Ratified by ballot. Amending it takes a 2/3 supermajority (§12).
 
-## Article I — Purpose
-Ultimate Dream exists to create a game through open, democratic collaboration. The game itself is the product; the process is the point.
+## 1. What this is
 
-## Article II — Governance Model
-- **Decisions by ballot**: Major directions (engine, license, scope, monetisation) are decided by ranked-choice vote of all contributors with ≥1 merged PR.
-- **Day-to-day by consent**: Routine work flows through proposals → PRs → code-owner review. No BDFL, no veto.
-- **Forks welcome**: This Constitution applies to the `main` branch of `rymcbc/ultimate-dream`. Forks may adopt, amend, or discard it.
+A world-wide, community-built game. Anyone may propose, everyone may vote, and nothing enters the game until it
+has passed a vote and been reviewed. The game is the product; this document is what stops the product from
+belonging to whoever shouts loudest or commits fastest.
 
-## Article III — Contributor Rights
-- **Attribution**: Every merged commit carries its author's name. No squash-merge erasure.
-- **DCO, not CLA**: `git commit -s` is the only legal gate. No external agreements.
-- **License ballot**: The project license is chosen by ballot (Article VII). Until then, MIT applies as a placeholder.
+## 2. The only way a change enters the game
 
-## Article IV — Asset Policy
-- Every asset folder under `assets/` **must** contain a `LICENSE.txt` declaring its terms.
-- No binary > 5 MB without a Git LFS pointer. No single file > 20 MB.
-- AI-generated assets are permitted if their generator's license allows redistribution.
+```text
+idea → proposal → 48-hour ballot → ratified → reviewed PR → merged
+```
 
-## Article V — Code Policy
-- `main` is protected: no direct pushes, 2 code-owner reviews, stale-review dismissal.
-- Required CI checks: `ci` (lint + tests + boot smoke) and `proposal-check`.
-- All code must pass `cargo fmt` / `black` / `prettier` as appropriate per language.
+No step may be skipped, and no one is exempt. A maintainer who wants a change opens a proposal like everyone
+else. The single exception is the bootstrap commit that creates this repository's review rules, which lands under
+`ledger/WAIVER-0001.md` because a gate cannot approve the commit that creates it.
 
-## Article VI — Proposal Process
-1. Open a **Proposal** issue (template: `.github/ISSUE_TEMPLATE/proposal.yml`).
-2. Discussion period: 7 days minimum.
-3. Ballot if contested (≥3 objectors), otherwise lazy consensus (7 days, no objection).
-4. Passed proposals → `DECISIONS/UD-###.md` + implementation tasks.
+## 3. The 48-hour ballot
 
-## Article VII — License Ballot
-- Trigger: 10 contributors with ≥1 merged PR, or 6 months after first commit, whichever comes first.
-- Options: MIT, Apache-2.0, GPL-3.0, LGPL-3.0, BSD-3-Clause, "Keep MIT".
-- Ranked-choice, instant-runoff. Winner binds `main` and all future forks of `main`.
+- **Window: exactly 48 hours, hard.** Server-side, UTC, no extensions, no early close, no exceptions for
+  holidays, outages or enthusiasm.
+- **Every eligible contributor may vote** for the whole window. Voting is `yes`, `no` or `abstain`.
+- **Notification at open**: every eligible contributor is told the ballot has opened, on the channel they chose
+  in their account — Discord DM, email, or Telegram. A contributor who received no notification has still had
+  their chance to vote; delivery is never a condition of a vote counting.
+- **Owner review at open**: the project owner receives a Discord DM at T0 naming the ballot, the proposal, the
+  window and the close time, and may **review or override** it during the window (§6).
+- **Close and result**: at T0+48h the ballot closes and the tally is computed from frozen votes. There is no
+  further waiting period — the 48 hours _is_ the notice period, and implementation may begin the moment the
+  result is recorded.
 
-## Article VIII — Amendment
-- This Constitution can be amended by the same ballot process as Article VII.
-- Amendments require 60% supermajority of voting contributors.
+## 4. Who may vote
 
-## Article IX — Dissolution
-- If `main` has 0 commits for 365 days, the project is dormant. Any contributor may petition GitHub to transfer ownership.
+- A linked GitHub account at least **30 days old** with a verified email. One account, one vote — uniqueness is
+  enforced by GitHub's numeric user id, never by login (logins get renamed and recycled).
+- No contribution requirement. Requiring a merged PR before the first vote would make the first vote impossible.
+- **Dormant** after 180 days with no vote and no merged PR; dormant accounts are dropped from the roster so
+  quorum tracks a living population instead of a graveyard that voids every ballot.
+- **Eligibility is frozen at open.** New signups during a window do not change who was eligible or what quorum
+  meant.
+
+## 5. Quorum and majority
+
+- **Quorum: 20% of the eligible roster, with a floor of 5 votes cast.** Abstain counts toward quorum and never
+  toward the majority.
+- **Below quorum**: the ballot is `void`, one automatic re-run with a fresh 48 hours, then it fails closed.
+- **Majority: more than 50% of yes+no.** A tie is **rejected** — a tie is not consent — and may be re-proposed
+  after a 14-day cooldown with amendments.
+- **Bootstrap**: the first three ballots use the floor of 5 only. This expires permanently on the third
+  decision; a percentage of a three-person roster is noise, and pretending otherwise would be theatre.
+
+## 6. Owner review and override
+
+The project owner is **Ryan**. At the start of every 48-hour window he is asked, in his Discord DMs, to review
+the ballot or override it.
+
+- An override **stops the ballot** and is recorded as a `revoke` record in the ledger with the owner's GitHub id
+  and a cited ground. It is not a quiet deletion; it is on the public record forever.
+- An override must cite **one of exactly four grounds**: legal or licensing, safety or terms of service,
+  security, or _does not build_. "I don't like it" is not a ground.
+- An override may be challenged: a fresh ballot reaching **2/3 of yes+no** sustains the proposal over the
+  override. The owner cannot be overridden by a simple majority, and cannot override by silence either — any
+  ballot he neither reviews nor overrides simply proceeds.
+- The owner has no other special power. He is one voter plus one documented, cited, challengeable stop button.
+
+## 7. Scope rule
+
+A proposal must be implementable in a single milestone. Oversized ideas are split into an epic with child
+proposals. Reviewers reject monoliths as "split this" — voting on a monolith is how a community approves
+something nobody can build.
+
+## 8. How a change actually merges
+
+Every merge requires **all** of:
+
+1. An approved proposal id cited in the PR.
+2. A ratified ledger record that verifies offline: intact hash chain, quorum met, majority reached, and a ballot
+   that was open for the full 48 hours between its GitHub-stamped open and close comments.
+3. Two code-owner reviews **against the current head commit** — a push after review invalidates it.
+4. A DCO `Signed-off-by` matching the commit author.
+5. Changed paths inside the proposal's declared scope.
+6. Every asset accompanied by a `LICENSE.txt` naming its source.
+7. Green CI.
+
+Direct pushes to `main` are forbidden for everyone, maintainers included. If a check is wrong, the check gets
+fixed by proposal — not bypassed by a push.
+
+## 9. Assets and licensing
+
+- Code license is chosen by ballot among MIT, Apache-2.0, MPL-2.0, GPL-3.0, AGPL-3.0. MIT applies as a
+  placeholder until that ballot closes.
+- Assets must be redistributable: CC0, CC-BY, or a license explicitly permitting redistribution. No file enters
+  the repository without a `LICENSE.txt` naming its origin.
+- AI-generated assets are permitted when the generator's terms allow redistribution; the tool and its license
+  are recorded in the sidecar.
+- No single file over 20 MB; no binary over 5 MB without a Git LFS pointer.
+
+## 10. Transparency
+
+- Every ballot, vote, tally and override is public and recomputable from GitHub alone, without our servers.
+- Financial decisions (if the project ever takes money) require a ballot and a quarterly public report.
+
+## 11. Forks and exit
+
+This document binds `main` of the official repository. Forks may adopt, amend or discard it. If `main` has no
+commits for 365 days the project is dormant and the repository is offered to its contributors. Code and
+decisions stay public either way — the ledger is designed so that the history outlives the servers.
+
+## 12. Amendment
+
+Changing this document is a proposal like any other, requiring a **2/3 supermajority of yes+no** and the same
+48-hour window. No clause is unamendable, including this one.
 
 ---
 
-*Signed by the founding contributors via DCO on their first commit.*
+_Signed by the founding contributors via DCO on their first commit._

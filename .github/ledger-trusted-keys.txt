@@ -1,0 +1,5 @@
+# Trust root for the ledger branch.
+# One signer key id per line. Keys listed here are the ONLY keys the gate will accept.
+# This file lives on main, which the governance service cannot push to:
+# a key that exists only on the ledger branch could re-sign a fully rewritten chain.
+# Fill in the service GitHub App key id before the first record lands.
