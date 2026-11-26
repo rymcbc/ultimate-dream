@@ -9,13 +9,34 @@ Welcome! This project runs on **proposals → PRs → reviews**. No drive-by mer
 3. **Claim**: Pick a task from the Project board or the proposal's task list.
 4. **Develop**: Branch from `main`, commit with `-s` (DCO), push.
 5. **PR**: Open a PR with `Approved-Proposal: UD-###` in the description.
-6. **Review**: Two code-owner approvals + green CI = merge.
+6. **Review**: green CI plus a maintainer merge. During bootstrap the maintainer merge is the lead's, under
+   `ledger/WAIVER-0001.md`.
 
 ## Commit Hygiene
 
-- **Sign every commit**: `git commit -s` (DCO enforced by CI).
+- **Sign every commit**: `git commit -s`. Advisory during bootstrap (we squash-merge, so the merge commit
+  carries the signer); required once the ballot engine is ratifying.
 - **Conventional commits**: `feat:`, `fix:`, `refactor:`, `docs:`, `assets:`, `ci:`, `chore:`.
 - **One logical change per PR**. Split if needed.
+
+## Worked example — a change that actually goes through
+
+This is the shape, not a hypothetical:
+
+```text
+1. Idea      "The repo needs a ledger format two machines can verify offline."
+2. Proposal  Issue: "Ledger v2 - hash-chained decision records"     -> becomes UD-001
+3. Ballot    48h window, quorum 20% of roster, majority of yes+no
+4. Ratified  record written to the ledger branch, hash published
+5. Build     branch ledger/format-v2, commits signed, tests added
+6. PR        title "[UD-001] ledger: hash-chained records"
+             body: what changed, the proof command, its real exit code,
+             and the line: Approved-Proposal: UD-001
+7. Merge     ci green, proposal-check green, maintainer squash-merge
+```
+
+The proof line matters more than the prose. A PR that says "all tests pass" without the command and its real
+exit code is sent back — paste the output, not a promise.
 
 ## Code Style
 
