@@ -18,7 +18,7 @@ ledger                                  orphan branch, append-only, force-push f
 
 CI reads the tip of `ledger`. `main` never contains it.
 
-## Hash rule (v2 — this is the one that matters)
+## Hash rule (v3 — this is the one that matters)
 
 ```text
 canonical_json = json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
@@ -33,9 +33,10 @@ are excluded.
 | version                | rule                                                                                                             | sample hash of the vector below | status             |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------ |
 | v0 (sketch)            | `sha256(prev_hash_hex + canonical(record))`, `prev_hash` excluded from the preimage                              | `2de74e9d…`                     | retired, must fail |
-| v1                     | same preimage as v2, but `schema_version: 1`, `voting_hours: 72`, no `owner_*` fields                            | `0d87f7b4…`                     | retired, must fail |
-| v2-draft               | `schema_version: 2` plus a `notice_hours: 48` field (a second, post-vote waiting period that the owner withdrew) | `fcd1a449…`                     | retired, must fail |
-| **v2 (this document)** | `sha256(canonical(record))`, `prev_hash` inside, `schema_version: 2`, one 48-hour window                         | `5451538b…`                     | **current**        |
+| v1                     | same preimage as v3, but `schema_version: 1`, `voting_hours: 72`, no `owner_*` fields                            | `0d87f7b4…`                     | retired, must fail |
+| v2                     | `schema_version: 2`, `ballot_closed_at` stored, `owner_notified_at` as a wall clock                               | `5451538b…`                     | withdrawn, must fail |
+| v2-draft               | v2 plus a `notice_hours: 48` field (a second, post-vote waiting period that the owner withdrew)                    | `fcd1a449…`                     | retired, must fail |
+| **v3 (this document)** | `sha256(canonical(record))`, `prev_hash` inside, `schema_version: 3`, one 48-hour window, comment-anchored owner block | `843665b1…`                     | **current**        |
 
 All four are pinned in `tests/test_ledger_format.py`; the three retired ones are asserted to _fail_, so nobody
 restores one by accident. A format hashed two ways is how an audit ends up with a decision that was legitimately
@@ -46,14 +47,13 @@ approved and cannot be proven.
 | field                                     | type                                           | notes                                                                                                |
 | ----------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | `kind`                                    | `ratify` \| `revoke` \| `waive` \| `supersede` | how to read the record                                                                               |
-| `schema_version`                          | int                                            | 2                                                                                                    |
+| `schema_version`                          | int                                            | 3                                                                                                    |
 | `decision_id`, `proposal_id`, `ballot_id` | str                                            | stable ids, not issue numbers                                                                        |
 | `open_comment_id`, `close_comment_id`     | int                                            | GitHub-stamped comments; the close comment's `created_at` is the only permitted window anchor        |
 | `voting_hours`                            | int                                            | **the single window**: 48 in production. Written at open so `closes_at` is derivable, never declared |
-| `owner_notified_at`                       | int \| null                                    | when the owner was DM'd at T0 (audit only, never a gate input)                                       |
+| `owner_notice_comment_id`                 | int                                            | the App's T0 notice comment on the proposal — proves notice was ISSUED, not that a DM was delivered |
 | `owner_decision`                          | `none` \| `reviewed` \| `override`             | silence is `none` and the ballot proceeds                                                            |
-| `owner_override_ground`                   | str \| null                                    | required when `owner_decision` is `override`; one of legal \| safety \| security \| build            |
-| `ballot_closed_at`                        | ISO8601 Z                                      | must equal `close_comment.created_at` exactly                                                        |
+| `owner_override_ground`                   | str \| null                                    | required when `owner_decision` is `override`; one of legal_licensing \| safety_tos \| security \| does_not_build |
 | `votes_ref`                               | path                                           | e.g. `votes/dec-2026-0001.json`                                                                      |
 | `ballot_snapshot_hash`                    | hex                                            | `sha256(JCS(votes array))`, frozen at close                                                          |
 | `eligibility_snapshot_hash`               | hex                                            | `sha256(JCS(eligible ids))`, frozen at open                                                          |
@@ -94,45 +94,16 @@ GitHub **committer** timestamps only; author dates are chosen by the contributor
 
 Canonical bytes:
 
-```json
-{
-  "approvers": [
-    {
-      "gh_id": 1001,
-      "review_id": 3912345678,
-      "reviewed_sha": "4f2a9c1e8b7d6a5f4e3d2c1b0a9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d"
-    }
-  ],
-  "ballot_closed_at": "2026-11-25T19:00:00.000Z",
-  "ballot_id": "bal-2026-0001",
-  "ballot_snapshot_hash": "fb7fb3e41180e4e28cdb6b97355d5c3b358ebafeb2c23a6daefd3edd8a5a9563",
-  "close_comment_id": 191234999,
-  "created_by": "githubapp:ultimate-dream-ledger",
-  "decision_id": "dec-2026-0001",
-  "eligibility_snapshot_hash": "3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c",
-  "head_sha": "4f2a9c1e8b7d6a5f4e3d2c1b0a9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d",
-  "kind": "ratify",
-  "open_comment_id": 191234567,
-  "owner_decision": "reviewed",
-  "owner_notified_at": 1795633200,
-  "owner_override_ground": null,
-  "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
-  "proposal_body_sha256": "7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d",
-  "proposal_id": "prop-2026-0001",
-  "quorum_rule": { "quorum": "0.20", "threshold": "0.50", "weighted": false },
-  "result": "ratified",
-  "schema_version": 2,
-  "scope_paths": ["game/content/props/**", "game/content/items/**"],
-  "signer_key_id": "k1",
-  "supersedes": null,
-  "tally": { "abstain": 0, "approve": 1, "reject": 0 },
-  "votes_ref": "votes/dec-2026-0001.json",
-  "voting_hours": 48
-}
+Exactly these bytes, one line, no trailing newline inside the fence. A pretty-printed copy is NOT
+the canonical form and will not hash to this value — which is why the fence is `text`, not `json`
+(a `json` fence gets reformatted by prettier and silently stops being canonical).
+
+```text
+{"approvers":[{"gh_id":1001,"review_id":3912345678,"reviewed_sha":"4f2a9c1e8b7d6a5f4e3d2c1b0a9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d"}],"ballot_id":"bal-2026-0001","ballot_snapshot_hash":"fb7fb3e41180e4e28cdb6b97355d5c3b358ebafeb2c23a6daefd3edd8a5a9563","close_comment_id":191234999,"created_by":"githubapp:ultimate-dream-ledger","decision_id":"dec-2026-0001","eligibility_snapshot_hash":"3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c","head_sha":"4f2a9c1e8b7d6a5f4e3d2c1b0a9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d","kind":"ratify","open_comment_id":191234567,"owner_decision":"none","owner_notice_comment_id":191234560,"owner_override_ground":null,"prev_hash":"0000000000000000000000000000000000000000000000000000000000000000","proposal_body_sha256":"7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d","proposal_id":"prop-2026-0001","quorum_rule":{"quorum":"0.20","threshold":"0.50","weighted":false},"result":"ratified","schema_version":3,"scope_paths":["game/content/props/**","game/content/items/**"],"signer_key_id":"k1","supersedes":null,"tally":{"abstain":0,"approve":1,"reject":0},"votes_ref":"votes/dec-2026-0001.json","voting_hours":48}
 ```
 
 ```text
-H(record) = 5451538b45503c04b7d8b5e939628c3f7aee4c43735d22d6dca673146e2932a4
+H(record) = 843665b13896c04e4acb3a386d149f6f5899943000414862a19cedf360bb63dc
 ```
 
 ### Vector B — vote snapshot
@@ -161,6 +132,7 @@ ballot_snapshot_hash = fb7fb3e41180e4e28cdb6b97355d5c3b358ebafeb2c23a6daefd3edd8
 | ------------------------------------------------------------------ | -------------------------------------------------------------------------- |
 | `6fa7e0e498031e7f41911119195e3b393027b56c7ed7a9e63ac2c507f2c6ad52` | v0 sketch (prefix rule)                                                    |
 | `0d87f7b4719159c11f00ba89a968c18fb869dc9fa630d0288b9a937c0b3abc1f` | v1 (`schema_version: 1`, `voting_hours: 72`, no owner fields)              |
+| `5451538b45503c04b7d8b5e939628c3f7aee4c43735d22d6dca673146e2932a4` | v2 (`ballot_closed_at` stored, `owner_notified_at` wall clock)             |
 | `fcd1a4495b37cb1803070a793e849bbefc9f1b570b8eff2f9e57bdb4abbf4701` | v2-draft (`notice_hours: 48` — a second waiting period the owner withdrew) |
 
 ## Bootstrap waiver
@@ -176,8 +148,10 @@ Records are append-only; a wrong record is superseded, and the old one stays for
 
 ## Open items
 
-- `schema_version` is **2** as of 2026-11-25, after the owner's 48-hour ruling. The three earlier shapes (v0 sketch,
-  v1, v2-draft) are retired above and none was ever produced in production.
+- `schema_version` is **3** as of 2026-11-25, after the owner's 48-hour ruling. Four shapes existed in one day and
+  none was ever produced in production: v0 sketch, v1, v2 (withdrawn) and v2-draft. All are retired above and
+  pinned as must-fail. **v3 is the last bump** — once a real record exists, a change is a `supersede` record, not a
+  new `schema_version`.
 - `voting_hours` — **resolved 2026-11-25 by the owner: 48 hours, one window.** The vector now carries `48`, so the
   pin and the policy finally agree; the earlier note that kept `72` in the vector to protect an agreed hash is
   withdrawn, because that hash belonged to a rule the owner rejected.
