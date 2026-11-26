@@ -19,8 +19,24 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Bootstrap waiver (the gate cannot approve the PR that creates it)
+        id: waiver
+        run: |
+          BODY="${{ github.event.pull_request.body }}"
+          if echo "$BODY" | grep -qi "Bootstrap-Waiver: WAIVER-0001"; then
+            if [ -f ledger/WAIVER-0001.md ]; then
+              echo "waived=true" >> $GITHUB_OUTPUT
+              echo "✓ Bootstrap-Waiver: WAIVER-0001 present and ledger/WAIVER-0001.md exists — proposal requirement waived for this one PR"
+              exit 0
+            fi
+            echo "✗ PR cites WAIVER-0001 but ledger/WAIVER-0001.md is not in the tree"
+            exit 1
+          fi
+          echo "waived=false" >> $GITHUB_OUTPUT
+
       - name: Check PR description for Approved-Proposal
         id: check
+        if: steps.waiver.outputs.waived != 'true'
         run: |
           BODY="${{ github.event.pull_request.body }}"
           if echo "$BODY" | grep -qi "Approved-Proposal: UD-[0-9]\+"; then
