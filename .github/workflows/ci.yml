@@ -76,11 +76,11 @@ jobs:
         run: |
           npx yaml-lint .github/workflows/*.yml || true
 
-      # Advisory: we squash-merge, and the merge commit carries the sign-off of whoever
-      # merges. A missing trailer on a work-in-progress branch is a note, not a failure —
-      # it was the single largest source of red builds and email for no safety gain.
-      - name: DCO check (advisory)
-        continue-on-error: true
+      # Blocking. This repo takes external contributions, so the certificate of origin is
+      # the thing that says a contributor had the right to submit the code — it is not a
+      # style note. Squash-merge commits are exempt inside tools/check_dco.sh (a merge
+      # commit carries the merger's sign-off); a contributor's own commits are not.
+      - name: DCO check
         run: |
           bash tools/check_dco.sh ${{ github.event.pull_request.head.sha || github.sha }}
 
