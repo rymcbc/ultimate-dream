@@ -33,7 +33,7 @@
       "models_style": "gemini",
       "models_path": "/models?pageSize=50",
       "chat_path": "/openai/chat/completions",
-      "probe_extra": {"reasoning_effort": "low"}
+      "probe_extra": { "reasoning_effort": "low" }
     }
   ]
 }

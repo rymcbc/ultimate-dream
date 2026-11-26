@@ -242,8 +242,16 @@ def main() -> int:
     catalogue = {"generated_at": now, "dry_run": args.dry_run, "providers": [p["name"] for p in providers],
                  "models": records}
     stamp = now.replace(":", "").replace("-", "")
-    (out_dir / f"{stamp}.json").write_text(json.dumps(catalogue, indent=2, sort_keys=True), encoding="utf-8")
-    latest.write_text(json.dumps(catalogue, indent=2, sort_keys=True), encoding="utf-8")
+    body = json.dumps(catalogue, indent=2, sort_keys=True)
+    (out_dir / f"{stamp}.json").write_text(body, encoding="utf-8")
+
+    # A run that probed nothing must not become the baseline: everything would
+    # look "regressed" on the next diff because no completion was attempted.
+    probed_now = sum(1 for r in records if r["probe_status"] not in ("catalogued", "no-credential"))
+    if probed_now:
+        latest.write_text(body, encoding="utf-8")
+    else:
+        print("no probes this run - latest.json left untouched (it stays the diff baseline)")
 
     ok = sum(1 for r in records if r["probe_status"] == "ok")
     free_ok = sum(1 for r in records if r["probe_status"] == "ok" and r["class"].startswith("free"))
