@@ -26,6 +26,8 @@ import hashlib
 import json
 import sqlite3
 from datetime import datetime, timezone
+from decimal import Decimal
+from math import ceil
 from typing import Any
 
 
@@ -228,6 +230,17 @@ def snapshot_hash(votes: list) -> str:
     return hashlib.sha256(canonical_bytes(votes)).hexdigest()
 
 
+def required_quorum(eligible_count: int) -> int:
+    """Voters who must participate for a ballot to count.
+
+    Below five eligible members, quorum is every eligible voter — otherwise a
+    founding ballot is void by construction and can never be re-run into a pass.
+    """
+    if eligible_count < 5:
+        return eligible_count
+    return min(eligible_count, max(5, ceil(0.20 * eligible_count)))
+
+
 def normalize_vote(
     voter_gh_id: int,
     comment_id: int,
@@ -367,6 +380,19 @@ class BallotEngine:
         ).fetchone():
             raise BallotError(f"ballot {ballot_id} already exists")
 
+        # Refuse what we do not implement: weighted tallies are read but never
+        # applied, so refuse the flag rather than silently ignore it. Quorum is
+        # derived from the frozen roster snapshot — the caller must not supply a
+        # number here. threshold is a fixed-decimal string, default 0.50.
+        if quorum_rule.get("weighted"):
+            raise BallotError("weighted tallies are not implemented; weighted=true is refused, not ignored")
+        try:
+            threshold = float(quorum_rule.get("threshold", "0.50"))
+        except (TypeError, ValueError):
+            raise BallotError(f"threshold must be a decimal string, got {quorum_rule.get('threshold')!r}")
+        if threshold < 0 or threshold > 1:
+            raise BallotError(f"threshold must be between 0 and 1, got {threshold}")
+
         # Validate the window will be 48h: closes_at is derived, not declared
         closes_at = self._derive_closes_at(opens_at)
 
@@ -446,10 +472,18 @@ class BallotEngine:
         """Record a vote. The vote is authored by the voter's own token —
         the engine never authors votes (CONTRACTS.md Section 4)."""
         row = self._conn.execute(
-            "SELECT votes FROM ballots WHERE ballot_id = ?", (ballot_id,)
+            "SELECT votes, opens_at, closes_at, close_comment_id FROM ballots WHERE ballot_id = ?",
+            (ballot_id,),
         ).fetchone()
         if not row:
             raise BallotError(f"ballot {ballot_id} not found")
+        if row[3] is not None:
+            raise VoteError(f"ballot {ballot_id} is closed")
+        created = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        opens = datetime.fromisoformat(row[1].replace("Z", "+00:00"))
+        closes = datetime.fromisoformat(row[2].replace("Z", "+00:00"))
+        if not (opens <= created <= closes):
+            raise VoteError(f"vote at {created_at} is outside {row[1]} .. {row[2]}")
 
         votes = json.loads(row[0])
         votes.append(
@@ -491,6 +525,13 @@ class BallotEngine:
         validate_window(opens_at, closes_at, row[4])  # voting_hours
 
         votes = json.loads(row[11])
+        # Filter by the close timestamp first — a vote that slipped in during
+        # the tick gap after closes_at cannot count even if it was written.
+        close_dt = datetime.fromisoformat(closes_at.replace("Z", "+00:00"))
+        votes = [
+            v for v in votes
+            if datetime.fromisoformat(v["created_at"].replace("Z", "+00:00")) <= close_dt
+        ]
         # Collapse to latest valid entry per voter; deleted comments voided
         snapshot = latest_per_voter(votes)
         snap_hash = snapshot_hash(snapshot)
@@ -498,17 +539,23 @@ class BallotEngine:
 
         # Quorum rule from the ballot record
         quorum_rule = json.loads(row[10])
-        quorum_met = self._check_quorum(tally, quorum_rule)
+        eligibility_snapshot = json.loads(row[8])
+        quorum_met = self._check_quorum(
+            tally, quorum_rule, int(eligibility_snapshot["eligible_count"])
+        )
 
-        # Result determination
+        # Result: void means quorum only. Once quorum is met, the approval
+        # threshold decides ratified vs rejected — a tie is rejected, never
+        # void, so a re-run is never spent on a 50/50.
         if not quorum_met:
             result = "void"
-        elif tally["approve"] > tally["reject"]:
-            result = "ratified"
-        elif tally["reject"] > tally["approve"]:
-            result = "rejected"
         else:
-            result = "void"
+            yes_no = tally["approve"] + tally["reject"]
+            threshold = Decimal(str(quorum_rule.get("threshold", "0.50")))
+            if yes_no > 0 and Decimal(tally["approve"]) / Decimal(yes_no) > threshold:
+                result = "ratified"
+            else:
+                result = "rejected"
 
         ballot = Ballot(
             ballot_id=ballot_id,
@@ -554,22 +601,18 @@ class BallotEngine:
 
     # -- quorum ------------------------------------------------------------
 
-    def _check_quorum(self, tally: dict, quorum_rule: dict) -> bool:
-        """Evaluate the quorum rule written at open. Data, never code."""
-        total = tally["approve"] + tally["reject"] + tally["abstain"]
-        quorum = float(quorum_rule.get("quorum", "0"))
-        threshold = float(quorum_rule.get("threshold", "0"))
-        weighted = quorum_rule.get("weighted", False)
+    def _check_quorum(self, tally: dict, quorum_rule: dict, eligible_count: int) -> bool:
+        """Participation quorum: did enough of the frozen roster vote?
 
-        if total == 0:
-            return False
-
-        participation = tally["approve"] + tally["reject"]  # abstentions don't count
-        if participation / total < quorum:
-            return False
-
-        approve_ratio = tally["approve"] / (tally["approve"] + tally["reject"]) if (tally["approve"] + tally["reject"]) > 0 else 0
-        return approve_ratio >= threshold
+        Quorum is participation only. The approval threshold is applied when
+        the result is decided, so a ballot that reaches quorum but fails the
+        threshold is `rejected`, not `void` — a re-run is legitimate only when
+        the roster did not turn out. `quorum_rule` is accepted for the record;
+        the participation number is derived from the roster, never from it.
+        """
+        required = required_quorum(eligible_count)
+        participating = tally["approve"] + tally["reject"] + tally["abstain"]  # abstain is participation
+        return participating >= required
 
     # -- read --------------------------------------------------------------
 

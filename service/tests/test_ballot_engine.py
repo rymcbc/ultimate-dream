@@ -34,6 +34,7 @@ from service.ballot_engine import (  # noqa: E402
 
 OPENED_AT = "2026-11-25T10:00:00.000Z"
 CLOSED_AT = "2026-11-27T10:00:00.000Z"  # exactly 48h later
+IN_WINDOW_AT = "2026-11-26T10:00:00.000Z"  # 24h into the 48h window
 
 
 def _make_engine() -> BallotEngine:
@@ -155,9 +156,9 @@ def test_close_ballot_twice_fails():
         open_comment_id=191234567,
         opens_at=OPENED_AT,
         eligibility_rule={},
-        eligibility_snapshot={},
+        eligibility_snapshot={"eligible_count": 1},
         nonce="n",
-        quorum_rule={},
+        quorum_rule={"threshold": "0.50", "weighted": False},
     )
     eng.close_ballot(
         ballot_id="bal-2026-0001",
@@ -250,11 +251,11 @@ def test_close_snapshot_hash_stored():
         open_comment_id=191234567,
         opens_at=OPENED_AT,
         eligibility_rule={},
-        eligibility_snapshot={},
+        eligibility_snapshot={"eligible_count": 1},
         nonce="n",
-        quorum_rule={"quorum": "0.0", "threshold": "0.0", "weighted": False},
+        quorum_rule={"threshold": "0.50", "weighted": False},
     )
-    eng.cast_vote("bal-2026-0001", 1001, 191234701, "2026-11-23T10:00:00.000Z", "2026-11-23T10:00:00.000Z", "ab" * 32, "reaction", "approve")
+    eng.cast_vote("bal-2026-0001", 1001, 191234701, IN_WINDOW_AT, IN_WINDOW_AT, "ab" * 32, "reaction", "approve")
     b = eng.close_ballot("bal-2026-0001", 191234999, CLOSED_AT)
     assert b.ballot_snapshot_hash is not None
     assert len(b.ballot_snapshot_hash) == 64
@@ -262,8 +263,8 @@ def test_close_snapshot_hash_stored():
         {
             "voter_gh_id": 1001,
             "comment_id": 191234701,
-            "created_at": "2026-11-23T10:00:00.000Z",
-            "updated_at": "2026-11-23T10:00:00.000Z",
+            "created_at": IN_WINDOW_AT,
+            "updated_at": IN_WINDOW_AT,
             "body_sha256": "ab" * 32,
             "source": "reaction",
             "choice": "approve",
@@ -279,13 +280,13 @@ def test_close_result_ratified():
         open_comment_id=191234567,
         opens_at=OPENED_AT,
         eligibility_rule={},
-        eligibility_snapshot={},
+        eligibility_snapshot={"eligible_count": 3},
         nonce="n",
-        quorum_rule={"quorum": "0.0", "threshold": "0.0", "weighted": False},
+        quorum_rule={"threshold": "0.50", "weighted": False},
     )
-    eng.cast_vote("bal-2026-0001", 1001, 1, "2026-11-23T10:00:00.000Z", "2026-11-23T10:00:00.000Z", "ab" * 32, "reaction", "approve")
-    eng.cast_vote("bal-2026-0001", 1002, 2, "2026-11-23T10:00:00.000Z", "2026-11-23T10:00:00.000Z", "ab" * 32, "reaction", "approve")
-    eng.cast_vote("bal-2026-0001", 1003, 3, "2026-11-23T10:00:00.000Z", "2026-11-23T10:00:00.000Z", "ab" * 32, "reaction", "reject")
+    eng.cast_vote("bal-2026-0001", 1001, 1, IN_WINDOW_AT, IN_WINDOW_AT, "ab" * 32, "reaction", "approve")
+    eng.cast_vote("bal-2026-0001", 1002, 2, IN_WINDOW_AT, IN_WINDOW_AT, "ab" * 32, "reaction", "approve")
+    eng.cast_vote("bal-2026-0001", 1003, 3, IN_WINDOW_AT, IN_WINDOW_AT, "ab" * 32, "reaction", "reject")
     b = eng.close_ballot("bal-2026-0001", 191234999, CLOSED_AT)
     assert b.result == "ratified"
     assert b.tally == {"approve": 2, "reject": 1, "abstain": 0}
@@ -300,15 +301,16 @@ def test_close_result_rejected():
         open_comment_id=191234567,
         opens_at=OPENED_AT,
         eligibility_rule={},
-        eligibility_snapshot={},
+        eligibility_snapshot={"eligible_count": 3},
         nonce="n",
-        quorum_rule={"quorum": "0.0", "threshold": "0.0", "weighted": False},
+        quorum_rule={"threshold": "0.50", "weighted": False},
     )
-    eng.cast_vote("bal-2026-0001", 1001, 1, "2026-11-23T10:00:00.000Z", "2026-11-23T10:00:00.000Z", "ab" * 32, "reaction", "reject")
-    eng.cast_vote("bal-2026-0001", 1002, 2, "2026-11-23T10:00:00.000Z", "2026-11-23T10:00:00.000Z", "ab" * 32, "reaction", "reject")
-    eng.cast_vote("bal-2026-0001", 1003, 3, "2026-11-23T10:00:00.000Z", "2026-11-23T10:00:00.000Z", "ab" * 32, "reaction", "approve")
+    eng.cast_vote("bal-2026-0001", 1001, 1, IN_WINDOW_AT, IN_WINDOW_AT, "ab" * 32, "reaction", "reject")
+    eng.cast_vote("bal-2026-0001", 1002, 2, IN_WINDOW_AT, IN_WINDOW_AT, "ab" * 32, "reaction", "reject")
+    eng.cast_vote("bal-2026-0001", 1003, 3, IN_WINDOW_AT, IN_WINDOW_AT, "ab" * 32, "reaction", "approve")
     b = eng.close_ballot("bal-2026-0001", 191234999, CLOSED_AT)
     assert b.result == "rejected"
+    assert b.quorum_met is True  # quorum is participation; the rejection is the threshold
 
 
 def test_close_result_void_no_quorum():
@@ -319,9 +321,9 @@ def test_close_result_void_no_quorum():
         open_comment_id=191234567,
         opens_at=OPENED_AT,
         eligibility_rule={},
-        eligibility_snapshot={},
+        eligibility_snapshot={"eligible_count": 3},
         nonce="n",
-        quorum_rule={"quorum": "0.90", "threshold": "0.50", "weighted": False},
+        quorum_rule={"threshold": "0.50", "weighted": False},
     )
     # No votes cast — quorum cannot be met with zero participation
     b = eng.close_ballot("bal-2026-0001", 191234999, CLOSED_AT)
@@ -330,7 +332,10 @@ def test_close_result_void_no_quorum():
     assert b.tally == {"approve": 0, "reject": 0, "abstain": 0}
 
 
-def test_close_result_void_tie():
+def test_close_result_tie_rejected():
+    """A tie is rejected, never void. Void is reserved for a quorum miss, and
+    only void triggers the automatic re-run — so a 50/50 does not get a fresh
+    48h window."""
     eng = _make_engine()
     eng.open_ballot(
         ballot_id="bal-2026-0001",
@@ -338,14 +343,131 @@ def test_close_result_void_tie():
         open_comment_id=191234567,
         opens_at=OPENED_AT,
         eligibility_rule={},
-        eligibility_snapshot={},
+        eligibility_snapshot={"eligible_count": 2},
         nonce="n",
-        quorum_rule={"quorum": "0.0", "threshold": "0.0", "weighted": False},
+        quorum_rule={"threshold": "0.50", "weighted": False},
     )
-    eng.cast_vote("bal-2026-0001", 1001, 1, "2026-11-23T10:00:00.000Z", "2026-11-23T10:00:00.000Z", "ab" * 32, "reaction", "approve")
-    eng.cast_vote("bal-2026-0001", 1002, 2, "2026-11-23T10:00:00.000Z", "2026-11-23T10:00:00.000Z", "ab" * 32, "reaction", "reject")
+    eng.cast_vote("bal-2026-0001", 1001, 1, IN_WINDOW_AT, IN_WINDOW_AT, "ab" * 32, "reaction", "approve")
+    eng.cast_vote("bal-2026-0001", 1002, 2, IN_WINDOW_AT, IN_WINDOW_AT, "ab" * 32, "reaction", "reject")
     b = eng.close_ballot("bal-2026-0001", 191234999, CLOSED_AT)
+    assert b.result == "rejected"
+    assert b.result != "void"  # void would spend a 48h re-run on a 50/50
+    assert b.quorum_met is True
+
+
+# --------------------------------------------------------------------------
+# Quorum — measured against the frozen roster, not the ballots received
+# --------------------------------------------------------------------------
+
+
+def _open(eng: BallotEngine, eligible_count: int, quorum_rule: dict | None = None) -> None:
+    eng.open_ballot(
+        ballot_id="bal-2026-0001",
+        proposal_id="prop-2026-0001",
+        open_comment_id=191234567,
+        opens_at=OPENED_AT,
+        eligibility_rule={},
+        eligibility_snapshot={"eligible_count": eligible_count},
+        nonce="n",
+        quorum_rule=quorum_rule or {"threshold": "0.50", "weighted": False},
+    )
+
+
+def test_quorum_100_eligible_one_vote_is_void():
+    eng = _make_engine()
+    _open(eng, 100)
+    eng.cast_vote("bal-2026-0001", 1001, 1, IN_WINDOW_AT, IN_WINDOW_AT, "ab" * 32, "reaction", "approve")
+    b = eng.close_ballot("bal-2026-0001", 191234999, CLOSED_AT)
+    assert b.quorum_met is False
     assert b.result == "void"
+
+
+def test_quorum_100_eligible_20_votes_is_met():
+    eng = _make_engine()
+    _open(eng, 100)
+    for i in range(20):
+        choice = "approve" if i < 12 else "reject"
+        eng.cast_vote("bal-2026-0001", 2000 + i, 100 + i, IN_WINDOW_AT, IN_WINDOW_AT, "ab" * 32, "reaction", choice)
+    b = eng.close_ballot("bal-2026-0001", 191234999, CLOSED_AT)
+    assert b.quorum_met is True
+    assert b.result == "ratified"
+
+
+def test_quorum_four_eligible_all_vote_is_met():
+    eng = _make_engine()
+    _open(eng, 4)
+    for i in range(4):
+        choice = "approve" if i < 3 else "reject"
+        eng.cast_vote("bal-2026-0001", 3000 + i, 200 + i, IN_WINDOW_AT, IN_WINDOW_AT, "ab" * 32, "reaction", choice)
+    b = eng.close_ballot("bal-2026-0001", 191234999, CLOSED_AT)
+    assert b.quorum_met is True
+    assert b.result == "ratified"
+
+
+def test_quorum_four_eligible_three_votes_is_void():
+    eng = _make_engine()
+    _open(eng, 4)
+    for i in range(3):
+        eng.cast_vote("bal-2026-0001", 3000 + i, 200 + i, IN_WINDOW_AT, IN_WINDOW_AT, "ab" * 32, "reaction", "approve")
+    b = eng.close_ballot("bal-2026-0001", 191234999, CLOSED_AT)
+    assert b.quorum_met is False
+    assert b.result == "void"
+
+
+def test_majority_reject_is_rejected_not_void():
+    """A ballot that reaches quorum but is rejected is `rejected`, not `void`.
+    Void must mean a quorum miss only, or every rejection buys a 48h re-run."""
+    eng = _make_engine()
+    _open(eng, 100)
+    for i in range(20):
+        choice = "approve" if i < 8 else "reject"  # 8 approve / 12 reject
+        eng.cast_vote("bal-2026-0001", 2000 + i, 100 + i, IN_WINDOW_AT, IN_WINDOW_AT, "ab" * 32, "reaction", choice)
+    b = eng.close_ballot("bal-2026-0001", 191234999, CLOSED_AT)
+    assert b.quorum_met is True
+    assert b.result == "rejected"
+
+
+def test_vote_after_close_rejected_on_cast():
+    eng = _make_engine()
+    _open(eng, 1)
+    late = "2026-11-27T10:00:01.000Z"  # one second after closes_at
+    try:
+        eng.cast_vote("bal-2026-0001", 1001, 1, late, late, "ab" * 32, "reaction", "approve")
+    except VoteError:
+        return
+    raise AssertionError("a vote after closes_at must be rejected on cast")
+
+
+def test_vote_after_close_excluded_from_snapshot():
+    eng = _make_engine()
+    _open(eng, 1)
+    late = {
+        "voter_gh_id": 1001,
+        "comment_id": 1,
+        "created_at": "2026-11-27T10:00:01.000Z",  # slipped in after the close
+        "updated_at": "2026-11-27T10:00:01.000Z",
+        "body_sha256": "ab" * 32,
+        "source": "reaction",
+        "choice": "approve",
+    }
+    # Seed it directly, as the tick-gap race would: the row is written but late.
+    eng._conn.execute(
+        "UPDATE ballots SET votes = ? WHERE ballot_id = ?",
+        (json.dumps([late]), "bal-2026-0001"),
+    )
+    eng._conn.commit()
+    b = eng.close_ballot("bal-2026-0001", 191234999, CLOSED_AT)
+    assert b.votes == []
+    assert b.tally == {"approve": 0, "reject": 0, "abstain": 0}
+
+
+def test_open_refuses_weighted():
+    eng = _make_engine()
+    try:
+        _open(eng, 3, {"threshold": "0.50", "weighted": True})
+    except BallotError:
+        return
+    raise AssertionError("weighted=true must be refused at open, not ignored")
 
 
 # --------------------------------------------------------------------------
