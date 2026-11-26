@@ -35,7 +35,7 @@
 | **C6: Asset pipeline (Blender/FBX/GLB)** | **PASS** | **GLB/glTF 2.0**: full native support (recommended). **`.blend`**: direct import by calling Blender's glTF exporter transparently (requires Blender installed). **FBX**: via `FBX2glTF` external tool (proprietary SDK dependency; Godot recommends glTF instead). <https://docs.godotengine.org/en/4.1/tutorials/assets_pipeline/importing_scenes.html> |
 | **C7: Bootable artifact from CI**        | **PASS** | `godot --headless --export-release "Windows Desktop" game.exe` produces a runnable `.exe` + `.pck`. Export templates (1.28 GB download, measured 2026-11-26) must be installed. Documented in command-line tutorial and `godot-ci` GitHub Action.                                                                                                        |
 
-**Contributor Cost (Godot 4.7.2)**
+#### Contributor Cost (Godot 4.7.2)
 
 - **Install size**: Editor ~200 MB; export templates **1.28 GB** (measured via `Content-Length` on `Godot_v4.7.2-stable_export_templates.tpz` from GitHub Releases, 2026-11-26). Total ~1.5 GB.
 - **GPU ceiling**: Minimum: integrated graphics with Vulkan 1.0 (Intel HD 510 / AMD Radeon R5). Recommended: dedicated GPU with Vulkan 1.2 (GTX 1050 / RX 460). <https://docs.godotengine.org/en/stable/about/system_requirements.html>
@@ -56,7 +56,7 @@
 | C6: Asset pipeline (Blender/FBX/GLB) | —        | Excellent FBX/GLB/USD import; Blender → UE pipeline via glTF or FBX. SMASH Export addon automates. <https://www.strayspark.studio/blog/blender-5-unreal-engine-asset-pipeline-2026>                                                                                                               |
 | C7: Bootable artifact from CI        | —        | `RunUAT BuildCookRun -pak -archive` produces shipped build. Documented in Epic tutorial and GitHub Actions marketplace (`UE5-Build-Project`).                                                                                                                                                     |
 
-**Contributor Cost (UE 5.8)**
+#### Contributor Cost (UE 5.8)
 
 - **Install size**: **100–120 GB** typical (download 35–60 GB, expands to 100+ GB). Reddit/forums report 110–123 GB post-install. <https://www.reddit.com/r/unrealengine/comments/va1bax/why_does_unreal_engine_5_require_123_gb_of_space/>
 - **GPU ceiling**: Minimum: DX11/Vulkan GPU (GTX 1060 6GB class). Recommended: RTX 3080 / RX 6800 class for Nanite/Lumen.
@@ -77,7 +77,7 @@
 | C6: Asset pipeline (Blender/FBX/GLB) | —        | Native FBX, glTF/GLB (via package), Blender `.blend` import (calls Blender). Good PBR/animation support.                                                                                                                                                                                                                                                                                                    |
 | C7: Bootable artifact from CI        | —        | `game-ci/unity-builder` produces platform builds (Win64, WebGL, etc.) as GitHub Actions artifacts. Documented.                                                                                                                                                                                                                                                                                              |
 
-**Contributor Cost (Unity 6)**
+#### Contributor Cost (Unity 6)
 
 - **Install size**: **20–50 GB** base editor + modules (IL2CPP, Android, WebGL, etc.). Multiple versions → 100+ GB. <https://discussions.unity.com/t/unity-editor-disk-size-growth-through-the-years/1723987>
 - **GPU ceiling**: Minimum: DX11/Metal/Vulkan GPU (integrated OK for 2D). Recommended: dedicated GPU for 3D/HDRP.
@@ -98,7 +98,7 @@
 | C6: Asset pipeline (Blender/FBX/GLB) | **PARTIAL** | **GLB/glTF**: native via `bevy_gltf` crate (feature-gated). Loads scenes, meshes, materials, animations, skins. <https://docs.rs/bevy/latest/bevy/gltf/index.html> **FBX**: no native support; must convert to glTF externally. **`.blend`**: no direct import; export glTF from Blender first.                        |
 | C7: Bootable artifact from CI        | **PASS**    | `cargo build --release` produces native executable (`.exe` on Windows). `cargo-bundle` or `tauri` can package .app/.deb/.msi. Standard Rust CI produces runnable binaries.                                                                                                                                             |
 
-**Contributor Cost (Bevy 0.15+)**
+#### Contributor Cost (Bevy 0.15+)
 
 - **Install size**: Rust toolchain ~4–6 GB; first Bevy build downloads **~3.5 GB** of crates (cargo cache) and compiles 272+ crates. Project dir ~4 GB after first build. <https://users.rust-lang.org/t/is-it-normal-that-the-project-takes-up-4-gb-of-space/75410>
 - **GPU ceiling**: Minimum: Vulkan 1.1 / DX11 / Metal (wgpu backend). Integrated graphics (Intel UHD 620+) work for simple scenes.
