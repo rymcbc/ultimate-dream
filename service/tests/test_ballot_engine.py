@@ -544,6 +544,45 @@ def hashlib_sha256_json(obj):
     return hashlib.sha256(canonical_bytes(obj)).hexdigest()
 
 
+def test_get_ballot_round_trips_identity():
+    """The row layout is (ballot_id, proposal_id, open_comment_id, close_comment_id, ...).
+    An off-by-one here silently swaps proposal_id into ballot_id."""
+    eng = _make_engine()
+    _open(eng, 1)
+    b = eng.get_ballot("bal-2026-0001")
+    assert b is not None
+    assert b.ballot_id == "bal-2026-0001"
+    assert b.proposal_id == "prop-2026-0001"
+    assert b.open_comment_id == 191234567
+    assert b.close_comment_id is None
+    assert b.voting_hours == 48
+    assert b.opens_at == OPENED_AT
+
+
+def test_list_ballots_round_trips_identity():
+    eng = _make_engine()
+    _open(eng, 1)
+    rows = eng.list_ballots()
+    assert [(r.ballot_id, r.proposal_id) for r in rows] == [
+        ("bal-2026-0001", "prop-2026-0001")
+    ]
+
+
+def test_close_ballot_record_round_trips_identity():
+    eng = _make_engine()
+    _open(eng, 1)
+    eng.cast_vote("bal-2026-0001", 1001, 1, IN_WINDOW_AT, IN_WINDOW_AT, "ab" * 32, "reaction", "approve")
+    closed = eng.close_ballot("bal-2026-0001", 191234999, CLOSED_AT)
+    assert closed.proposal_id == "prop-2026-0001"
+    assert closed.open_comment_id == 191234567
+    stored = eng.get_ballot("bal-2026-0001")
+    assert stored.ballot_id == "bal-2026-0001"
+    assert stored.proposal_id == "prop-2026-0001"
+    assert stored.close_comment_id == 191234999
+    assert stored.result == "ratified"
+    assert stored.votes[0]["comment_id"] == 1
+
+
 if __name__ == "__main__":
     failures = 0
     for name, fn in sorted(globals().items()):
