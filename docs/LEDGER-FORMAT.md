@@ -30,13 +30,13 @@ are excluded.
 
 **Superseded rules — never produced in production, must never verify:**
 
-| version                | rule                                                                                                             | sample hash of the vector below | status             |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------ |
-| v0 (sketch)            | `sha256(prev_hash_hex + canonical(record))`, `prev_hash` excluded from the preimage                              | `2de74e9d…`                     | retired, must fail |
-| v1                     | same preimage as v3, but `schema_version: 1`, `voting_hours: 72`, no `owner_*` fields                            | `0d87f7b4…`                     | retired, must fail |
-| v2                     | `schema_version: 2`, `ballot_closed_at` stored, `owner_notified_at` as a wall clock                               | `5451538b…`                     | withdrawn, must fail |
-| v2-draft               | v2 plus a `notice_hours: 48` field (a second, post-vote waiting period that the owner withdrew)                    | `fcd1a449…`                     | retired, must fail |
-| **v3 (this document)** | `sha256(canonical(record))`, `prev_hash` inside, `schema_version: 3`, one 48-hour window, comment-anchored owner block | `843665b1…`                     | **current**        |
+| version                | rule                                                                                                                   | sample hash of the vector below | status               |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------- | -------------------- |
+| v0 (sketch)            | `sha256(prev_hash_hex + canonical(record))`, `prev_hash` excluded from the preimage                                    | `2de74e9d…`                     | retired, must fail   |
+| v1                     | same preimage as v3, but `schema_version: 1`, `voting_hours: 72`, no `owner_*` fields                                  | `0d87f7b4…`                     | retired, must fail   |
+| v2                     | `schema_version: 2`, `ballot_closed_at` stored, `owner_notified_at` as a wall clock                                    | `5451538b…`                     | withdrawn, must fail |
+| v2-draft               | v2 plus a `notice_hours: 48` field (a second, post-vote waiting period that the owner withdrew)                        | `fcd1a449…`                     | retired, must fail   |
+| **v3 (this document)** | `sha256(canonical(record))`, `prev_hash` inside, `schema_version: 3`, one 48-hour window, comment-anchored owner block | `843665b1…`                     | **current**          |
 
 All four are pinned in `tests/test_ledger_format.py`; the three retired ones are asserted to _fail_, so nobody
 restores one by accident. A format hashed two ways is how an audit ends up with a decision that was legitimately
@@ -44,30 +44,30 @@ approved and cannot be proven.
 
 ## Record fields (all required)
 
-| field                                     | type                                           | notes                                                                                                |
-| ----------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `kind`                                    | `ratify` \| `revoke` \| `waive` \| `supersede` | how to read the record                                                                               |
-| `schema_version`                          | int                                            | 3                                                                                                    |
-| `decision_id`, `proposal_id`, `ballot_id` | str                                            | stable ids, not issue numbers                                                                        |
-| `open_comment_id`, `close_comment_id`     | int                                            | GitHub-stamped comments; the close comment's `created_at` is the only permitted window anchor        |
-| `voting_hours`                            | int                                            | **the single window**: 48 in production. Written at open so `closes_at` is derivable, never declared |
-| `owner_notice_comment_id`                 | int                                            | the App's T0 notice comment on the proposal — proves notice was ISSUED, not that a DM was delivered |
-| `owner_decision`                          | `none` \| `reviewed` \| `override`             | silence is `none` and the ballot proceeds                                                            |
+| field                                     | type                                           | notes                                                                                                            |
+| ----------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `kind`                                    | `ratify` \| `revoke` \| `waive` \| `supersede` | how to read the record                                                                                           |
+| `schema_version`                          | int                                            | 3                                                                                                                |
+| `decision_id`, `proposal_id`, `ballot_id` | str                                            | stable ids, not issue numbers                                                                                    |
+| `open_comment_id`, `close_comment_id`     | int                                            | GitHub-stamped comments; the close comment's `created_at` is the only permitted window anchor                    |
+| `voting_hours`                            | int                                            | **the single window**: 48 in production. Written at open so `closes_at` is derivable, never declared             |
+| `owner_notice_comment_id`                 | int                                            | the App's T0 notice comment on the proposal — proves notice was ISSUED, not that a DM was delivered              |
+| `owner_decision`                          | `none` \| `reviewed` \| `override`             | silence is `none` and the ballot proceeds                                                                        |
 | `owner_override_ground`                   | str \| null                                    | required when `owner_decision` is `override`; one of legal_licensing \| safety_tos \| security \| does_not_build |
-| `votes_ref`                               | path                                           | e.g. `votes/dec-2026-0001.json`                                                                      |
-| `ballot_snapshot_hash`                    | hex                                            | `sha256(JCS(votes array))`, frozen at close                                                          |
-| `eligibility_snapshot_hash`               | hex                                            | `sha256(JCS(eligible ids))`, frozen at open                                                          |
-| `head_sha`                                | 40 hex                                         | the tree the approvers reviewed; the merge must match it                                             |
-| `approvers`                               | array                                          | `{gh_id, review_id, reviewed_sha}` — re-fetched from the API, never trusted as claimed               |
-| `scope_paths`                             | array                                          | globs the PR must stay inside                                                                        |
-| `proposal_body_sha256`                    | hex                                            | the pitch that was actually voted on                                                                 |
-| `quorum_rule`                             | object                                         | `{quorum, threshold, weighted}`, decimals as strings                                                 |
-| `tally`                                   | object                                         | `{approve, reject, abstain}`                                                                         |
-| `result`                                  | `ratified` \| `rejected` \| `void` \| `waived` | **writer's vocabulary** — the gate adopts it, not the reverse                                        |
-| `prev_hash`                               | 64 hex                                         | genesis = 64 zeros                                                                                   |
-| `signer_key_id`                           | str                                            | which key in `keys/` signed it                                                                       |
-| `supersedes`                              | id \| null                                     | append-only correction, never an edit                                                                |
-| `created_by`                              | str                                            | writer identity, e.g. `githubapp:ultimate-dream-ledger`                                              |
+| `votes_ref`                               | path                                           | e.g. `votes/dec-2026-0001.json`                                                                                  |
+| `ballot_snapshot_hash`                    | hex                                            | `sha256(JCS(votes array))`, frozen at close                                                                      |
+| `eligibility_snapshot_hash`               | hex                                            | `sha256(JCS(eligible ids))`, frozen at open                                                                      |
+| `head_sha`                                | 40 hex                                         | the tree the approvers reviewed; the merge must match it                                                         |
+| `approvers`                               | array                                          | `{gh_id, review_id, reviewed_sha}` — re-fetched from the API, never trusted as claimed                           |
+| `scope_paths`                             | array                                          | globs the PR must stay inside                                                                                    |
+| `proposal_body_sha256`                    | hex                                            | the pitch that was actually voted on                                                                             |
+| `quorum_rule`                             | object                                         | `{quorum, threshold, weighted}`, decimals as strings                                                             |
+| `tally`                                   | object                                         | `{approve, reject, abstain}`                                                                                     |
+| `result`                                  | `ratified` \| `rejected` \| `void` \| `waived` | **writer's vocabulary** — the gate adopts it, not the reverse                                                    |
+| `prev_hash`                               | 64 hex                                         | genesis = 64 zeros                                                                                               |
+| `signer_key_id`                           | str                                            | which key in `keys/` signed it                                                                                   |
+| `supersedes`                              | id \| null                                     | append-only correction, never an edit                                                                            |
+| `created_by`                              | str                                            | writer identity, e.g. `githubapp:ultimate-dream-ledger`                                                          |
 
 ## One window: 48 hours (owner ruling, 2026-11-25)
 
