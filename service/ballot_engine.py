@@ -563,8 +563,8 @@ class BallotEngine:
 
         ballot = Ballot(
             ballot_id=ballot_id,
-            proposal_id=row[2],
-            open_comment_id=row[3],
+            proposal_id=row[1],
+            open_comment_id=row[2],
             close_comment_id=close_comment_id,
             voting_hours=row[4],
             opens_at=row[5],
@@ -634,10 +634,10 @@ class BallotEngine:
 
     def _row_to_ballot(self, row: tuple) -> Ballot:
         return Ballot(
-            ballot_id=row[1],
-            proposal_id=row[2],
-            open_comment_id=row[3],
-            close_comment_id=row[4],
+            ballot_id=row[0],
+            proposal_id=row[1],
+            open_comment_id=row[2],
+            close_comment_id=row[3],
             voting_hours=row[4],
             opens_at=row[5],
             closes_at=row[6],
