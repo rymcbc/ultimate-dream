@@ -274,16 +274,17 @@ def get_account(gh_id: int) -> Optional[Dict[str, Any]]:
 # Channel management
 # ---------------------------------------------------------------------------
 
-CHANNEL_TYPES = {"discord_dm", "webhook", "rss"}  # email deferred per CONTRACTS.md
+CHANNEL_TYPES = {"discord_dm", "webhook", "rss", "email"}
 
 
 def add_channel(gh_id: int, channel_type: str, config: Dict[str, Any]) -> Dict[str, Any]:
     """Add a notification channel for a contributor.
 
-    channel_type in {"discord_dm", "webhook", "rss"}
+    channel_type in {"discord_dm", "webhook", "rss", "email"}
     - discord_dm: config = {"user_id": str} — we attempt one DM; records dm_reachable
     - webhook: config = {"url": str} — we echo a challenge token back
     - rss: config = {"feed_url": str} — generated, never verified
+    - email: config = {"email": str} — generates a verification token; verified by token link
 
     Returns the channel record as stored.
     """
@@ -323,9 +324,37 @@ def add_channel(gh_id: int, channel_type: str, config: Dict[str, Any]) -> Dict[s
             "generated": True,  # RSS is generated, never verified
             "added_at": datetime.now(timezone.utc).isoformat(),
         }
+    elif channel_type == "email":
+        email = config.get("email", "")
+        token = _generate_challenge()
+        channel = {
+            "channel_type": channel_type,
+            "config": config,
+            "verification_token": token,
+            "verified": False,  # email verifies by token link
+            "added_at": datetime.now(timezone.utc).isoformat(),
+        }
 
     _CHANNELS.setdefault(gh_id, {})[channel_type] = channel
     return channel
+
+
+def verify_email_channel(gh_id: int, token: str) -> bool:
+    """Verify an email channel by matching the verification token.
+
+    Returns True if the token matches and the channel is now verified.
+    Returns False if no email channel exists or the token doesn't match.
+    """
+    channels = _CHANNELS.get(gh_id, {})
+    ch = channels.get("email")
+    if not ch or ch.get("channel_type") != "email":
+        return False
+    if ch.get("verification_token") != token:
+        return False
+    ch["verified"] = True
+    ch["verified_at"] = datetime.now(timezone.utc).isoformat()
+    _CHANNELS[gh_id]["email"] = ch
+    return True
 
 
 def remove_channel(gh_id: int, channel_type: str) -> bool:

@@ -25,6 +25,7 @@ from governance.accounts import (
     add_channel,
     remove_channel,
     get_channels,
+    verify_email_channel,
     set_preference_order,
     get_preference_order,
     normalize_preferences,
@@ -193,6 +194,59 @@ def test_add_rss_channel_is_generated_not_verified():
     assert channel.get("generated") is True
 
 
+def test_add_email_channel_generates_token_and_is_unverified():
+    """Adding an email channel generates a verification token and is unverified."""
+    fresh()
+    set_github_api(FakeGitHubAPI())
+    link_github_account(12345, "testuser", "tok")
+
+    channel = add_channel(12345, "email", {"email": "test@example.com"})
+
+    assert channel["channel_type"] == "email"
+    assert channel["verified"] is False
+    assert "verification_token" in channel
+    assert len(channel["verification_token"]) == 16
+
+
+def test_verify_email_channel_by_token():
+    """Verifying an email channel with the correct token marks it verified."""
+    fresh()
+    set_github_api(FakeGitHubAPI())
+    link_github_account(12345, "testuser", "tok")
+
+    channel = add_channel(12345, "email", {"email": "test@example.com"})
+    token = channel["verification_token"]
+
+    assert verify_email_channel(12345, token) is True
+
+    channels = get_channels(12345)
+    assert channels["email"]["verified"] is True
+    assert "verified_at" in channels["email"]
+
+
+def test_verify_email_channel_wrong_token_fails():
+    """A wrong verification token fails and does not mark the channel verified."""
+    fresh()
+    set_github_api(FakeGitHubAPI())
+    link_github_account(12345, "testuser", "tok")
+
+    add_channel(12345, "email", {"email": "test@example.com"})
+
+    assert verify_email_channel(12345, "wrong_token") is False
+
+    channels = get_channels(12345)
+    assert channels["email"]["verified"] is False
+
+
+def test_verify_email_channel_no_email_channel_returns_false():
+    """Verifying when no email channel exists returns False."""
+    fresh()
+    set_github_api(FakeGitHubAPI())
+    link_github_account(12345, "testuser", "tok")
+
+    assert verify_email_channel(12345, "any_token") is False
+
+
 def test_remove_channel():
     """Removing a channel deletes it from the store."""
     fresh()
@@ -282,7 +336,7 @@ def test_preference_order_invalid_types_ignored():
     set_github_api(FakeGitHubAPI())
     link_github_account(12345, "testuser", "tok")
 
-    prefs = set_preference_order(12345, ["discord_dm", "email", "rss"])
+    prefs = set_preference_order(12345, ["discord_dm", "sms", "rss"])
 
     assert prefs == {"discord_dm": 1, "rss": 2}
 
@@ -394,6 +448,10 @@ if __name__ == "__main__":
         ("test_add_discord_dm_channel_records_reachability", test_add_discord_dm_channel_records_reachability),
         ("test_add_webhook_channel_echoes_challenge", test_add_webhook_channel_echoes_challenge),
         ("test_add_rss_channel_is_generated_not_verified", test_add_rss_channel_is_generated_not_verified),
+        ("test_add_email_channel_generates_token_and_is_unverified", test_add_email_channel_generates_token_and_is_unverified),
+        ("test_verify_email_channel_by_token", test_verify_email_channel_by_token),
+        ("test_verify_email_channel_wrong_token_fails", test_verify_email_channel_wrong_token_fails),
+        ("test_verify_email_channel_no_email_channel_returns_false", test_verify_email_channel_no_email_channel_returns_false),
         ("test_remove_channel", test_remove_channel),
         ("test_remove_nonexistent_channel_returns_false", test_remove_nonexistent_channel_returns_false),
         ("test_channels_for_account", test_channels_for_account),
