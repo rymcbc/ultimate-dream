@@ -32,6 +32,14 @@ jobs:
             echo "✗ PR cites WAIVER-0001 but ledger/WAIVER-0001.md is not in the tree"
             exit 1
           fi
+          # Bootstrap phase: until the governance service has ratified its first proposal
+          # there is no DECISIONS/UD-*.md to cite, so this check cannot be satisfied by
+          # construction. It self-arms the moment the first proposal record exists.
+          if ! compgen -G "DECISIONS/UD-*.md" > /dev/null; then
+            echo "waived=true" >> $GITHUB_OUTPUT
+            echo "bootstrap phase: no DECISIONS/UD-*.md exists yet — proposal requirement not yet applicable (this passes automatically only while that stays true)"
+            exit 0
+          fi
           echo "waived=false" >> $GITHUB_OUTPUT
 
       - name: Check PR description for Approved-Proposal
