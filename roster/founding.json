@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "roster": "founding",
+  "note": "The electorate. Until GitHub OAuth accounts land, this file is the only source of truth for who may vote. Eligibility is frozen at ballot open against this list.",
+  "members": [
+    {
+      "gh_id": 122483695,
+      "login": "rymcbc",
+      "role": "owner",
+      "source": "founding",
+      "eligible": true,
+      "joined_at": "2026-11-26T00:00:00Z"
+    }
+  ]
+}
