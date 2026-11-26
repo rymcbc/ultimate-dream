@@ -2,4 +2,7 @@
 # One signer key id per line. Keys listed here are the ONLY keys the gate will accept.
 # This file lives on main, which the governance service cannot push to:
 # a key that exists only on the ledger branch could re-sign a fully rewritten chain.
-# Fill in the service GitHub App key id before the first record lands.
+# The public key material for each id lives in .github/ledger-keys/<id>.pub, also on
+# main: pointing --keys-dir at the ledger branch would let a rewritten ledger supply
+# its own key under a trusted id and defeat this file entirely.
+ledger-2026-11
