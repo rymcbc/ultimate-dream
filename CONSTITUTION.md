@@ -49,8 +49,12 @@ else. The single exception is the bootstrap commit that creates this repository'
 - **Below quorum**: the ballot is `void`, one automatic re-run with a fresh 48 hours, then it fails closed.
 - **Majority: more than 50% of yes+no.** A tie is **rejected** — a tie is not consent — and may be re-proposed
   after a 14-day cooldown with amendments.
-- **Bootstrap**: the first three ballots use the floor of 5 only. This expires permanently on the third
-  decision; a percentage of a three-person roster is noise, and pretending otherwise would be theatre.
+- **Bootstrap (roster below the floor)**: the floor of 5 may never exceed the eligible roster. While fewer than
+  5 members are eligible, quorum is **every eligible voter** — with a one-person roster the founder decides, the
+  ballot is valid, and the record states the quorum actually required. This is not a percentage claim dressed
+  up as one; it is the whole electorate voting, which is the smallest honest quorum that can exist. The floor of
+  5 takes over automatically the moment the roster reaches 5, and the three-ballot bootstrap expires permanently
+  on the third decision.
 
 ## 6. Owner review and override
 

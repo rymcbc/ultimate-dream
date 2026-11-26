@@ -45,6 +45,15 @@ Three transports, chosen per contributor at signup and changeable any time:
 Rules: retry with backoff, fall through to the next preferred channel on hard failure, never send the same
 ballot twice on the same channel, and never make delivery a condition of a vote counting.
 
+## Quorum, including a one-person roster
+
+Quorum is 20% of the eligible roster with a floor of 5 votes cast — except that the floor can never exceed the
+roster. While fewer than 5 members are eligible, quorum is **every eligible voter**, so a founding ballot with
+one eligible member is decided by that member, is valid, and records the quorum it actually required. The floor
+of 5 governs again the moment the roster reaches 5. This is deliberately not a percentage of one dressed up as
+democracy: it is the entire electorate, and it is the only rule under which a project can start on day one with
+one person and still mean the same thing when there are five hundred.
+
 ## Escalation
 
 | Situation                           | Action                                                                                  |
