@@ -43,7 +43,7 @@ duplicate code that doesn't.
 
 - **JARVIS** — governance service, ballot engine, notifications/fan-out, ledger writer, accounts
 - **Merlin** — repo shape, CI gate, dashboard, voting UX, and **all merges**
-- Anything that changes the *machine* (installs, services, config, keys) is Ryan's call, not a
+- Anything that changes the _machine_ (installs, services, config, keys) is Ryan's call, not a
   lane call.
 
 ## Changing this file
