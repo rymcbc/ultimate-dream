@@ -34,6 +34,12 @@ from notification import (  # noqa: E402
     TelegramChannel,
     make_channel,
     SendResult,
+    RateLimiter,
+    OwnerChoice,
+    OWNER_CHOICES,
+    EnvelopeType,
+    build_envelope,
+    Channel,
 )
 
 
@@ -374,16 +380,35 @@ async def test_retry_with_backoff():
 
 async def test_owner_notify_fires_every_time():
     """Owner (Ryan) gets a mandatory Discord DM at T0 of every ballot,
-    even if contributor notifications are muted."""
+    even if contributor notifications are muted.
+    Records owner_notified_at and owner_choice in audit event.
+    """
     fanout = NotificationFanOut(channels={ChannelType.DISCORD_DM: DiscordDMChannel()})
     envelope = make_envelope("B-OWNER")
 
+    # Default choice = "none"
     result = await fanout.owner_notify(envelope)
 
     assert result.status == "sent"
     assert result.channel == ChannelType.DISCORD_DM
     assert result.audit.contributor_id == "owner"
+    assert result.audit.owner_notified_at is not None
+    assert result.audit.owner_choice == "none"
     print(f"  [owner] notified via {result.channel.value} msg={result.message_id}")
+    print(f"  [owner] audit: notified_at={result.audit.owner_notified_at}, choice={result.audit.owner_choice}")
+
+    # Test with explicit choice
+    envelope2 = make_envelope("B-OWNER2")
+    result2 = await fanout.owner_notify(envelope2, choice="reviewed")
+    assert result2.audit.owner_choice == "reviewed"
+    assert result2.audit.owner_notified_at is not None
+    print(f"  [owner] choice=reviewed audit: choice={result2.audit.owner_choice}")
+
+    # Test with override choice
+    envelope3 = make_envelope("B-OWNER3")
+    result3 = await fanout.owner_notify(envelope3, choice="override")
+    assert result3.audit.owner_choice == "override"
+    print(f"  [owner] choice=override audit: choice={result3.audit.owner_choice}")
 
 
 async def test_all_channels_exhausted_returns_all_results():
@@ -414,6 +439,156 @@ async def test_all_channels_exhausted_returns_all_results():
     print(f"  [c_allfail] all {len(results)} channels failed — results surfaced, nothing vanished")
 
 
+async def test_owner_choice_recorded_later_after_notify():
+    """The owner may reply after the T0 DM. record_owner_choice captures that
+    reply and writes an audit event — silence remains 'none' and the ballot proceeds."""
+    audit = FakeAuditLog()
+    fanout = NotificationFanOut(
+        channels={ChannelType.DISCORD_DM: DiscordDMChannel()},
+        audit_hook=audit,
+    )
+    envelope = make_envelope("B-LATE")
+
+    # T0 notification — no reply yet, so the choice is 'none' (silence = none)
+    await fanout.owner_notify(envelope)
+    assert fanout.get_owner_choice("B-LATE") == "none"
+
+    # Owner replies 'override' after the fact
+    record = fanout.record_owner_choice("B-LATE", "override")
+    assert record["owner_choice"] == "override"
+    assert record["owner_notified_at"] is not None  # T0 timestamp preserved
+    assert fanout.get_owner_choice("B-LATE") == "override"
+
+    # The change is audited, not silent
+    choice_events = [e for e in audit.events if e.owner_choice == "override"]
+    assert len(choice_events) >= 1
+    assert choice_events[-1].contributor_id == "owner"
+    print(f"  [owner] late choice recorded: {fanout.get_owner_choice('B-LATE')}")
+
+
+async def test_owner_choice_invalid_rejected():
+    """An invalid owner choice is rejected loudly with the offending value —
+    it must never be recorded as if it were valid."""
+    fanout = NotificationFanOut(channels={ChannelType.DISCORD_DM: DiscordDMChannel()})
+    envelope = make_envelope("B-BADCHOICE")
+
+    try:
+        await fanout.owner_notify(envelope, choice="maybe")
+    except ValueError as exc:
+        assert "maybe" in str(exc)
+        print(f"  [owner] invalid choice rejected: {exc}")
+    else:
+        raise AssertionError("expected ValueError for invalid owner choice")
+
+    try:
+        fanout.record_owner_choice("B-BADCHOICE", "nope")
+    except ValueError as exc:
+        assert "nope" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for invalid owner choice")
+
+    # Nothing was recorded — a rejected choice leaves the ballot at 'none'
+    assert fanout.get_owner_choice("B-BADCHOICE") == "none"
+
+
+async def test_owner_choice_enum_covers_ruling():
+    """The ruling's vocabulary is exactly none | reviewed | override."""
+    assert OWNER_CHOICES == ("none", "reviewed", "override")
+    assert OwnerChoice.NONE.value == "none"
+    assert OwnerChoice.REVIEWED.value == "reviewed"
+    assert OwnerChoice.OVERRIDE.value == "override"
+
+
+async def test_webhook_hmac_signature():
+    """The webhook channel signs the canonical body with HMAC-SHA256 — the
+    card requires a webhook to carry an HMAC header."""
+    import hmac
+    import hashlib
+
+    webhook = WebhookChannel(url="https://example.com/hook", secret="s3cret")
+    envelope = make_envelope("B-HMAC")
+
+    fanout = NotificationFanOut(channels={ChannelType.WEBHOOK: webhook})
+    prefs = ContributorPrefs(contributor_id="c_hmac", channels=[ChannelType.WEBHOOK])
+    results = await fanout.send_ballot("c_hmac", envelope, prefs)
+
+    assert results[0].status == "sent"
+    assert webhook.last_signature is not None
+
+    expected = hmac.new(
+        b"s3cret",
+        Channel.canonical_body(envelope),
+        hashlib.sha256,
+    ).hexdigest()
+    assert webhook.last_signature == expected
+    print(f"  [c_hmac] webhook HMAC signature: {webhook.last_signature[:16]}...")
+
+
+async def test_envelope_types_and_builder():
+    """The shared envelope contract covers all four emitted types."""
+    assert EnvelopeType.BALLOT_OPEN.value == "ballot_open"
+    assert EnvelopeType.BALLOT_RESULT.value == "ballot_result"
+    assert EnvelopeType.PROPOSAL_MERGED.value == "proposal_merged"
+    assert EnvelopeType.PROPOSAL_REJECTED.value == "proposal_rejected"
+
+    proposal = {
+        "id": "UD-142",
+        "title": "Add dynamic lighting",
+        "category": "gameplay",
+        "summary": "x" * 300,
+    }
+    ballot = {
+        "id": "B-88",
+        "opens_at": 1795600000,
+        "closes_at": 1795772800,
+        "url": "https://example.com/ballot/B-88",
+    }
+    env = build_envelope(EnvelopeType.BALLOT_OPEN, proposal, ballot, [
+        {"label": "Vote yes", "url": "https://example.com/ballot/B-88/yes"},
+    ])
+    assert env["type"] == "ballot_open"
+    assert env["proposal"]["id"] == "UD-142"
+    assert env["proposal"]["summary"] == "x" * 120  # capped at 120 chars
+    assert env["ballot"]["id"] == "B-88"
+    assert env["calls_to_action"][0]["label"] == "Vote yes"
+
+    # The other three types build from the same helper
+    for t in (EnvelopeType.BALLOT_RESULT, EnvelopeType.PROPOSAL_MERGED, EnvelopeType.PROPOSAL_REJECTED):
+        e = build_envelope(t, proposal, ballot)
+        assert e["type"] == t.value
+        assert e["ballot"]["id"] == "B-88"
+
+    # An unknown type is rejected loudly, naming the offending value
+    try:
+        build_envelope("ballot_opne", proposal, ballot)
+    except ValueError as exc:
+        assert "ballot_opne" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for unknown envelope type")
+    print("  [envelope] all four envelope types build; unknown type rejected")
+
+
+async def test_owner_notify_records_audit_with_timestamp():
+    """The owner audit event carries owner_notified_at AND owner_choice —
+    both are present on the event, not just implied."""
+    audit = FakeAuditLog()
+    fanout = NotificationFanOut(
+        channels={ChannelType.DISCORD_DM: DiscordDMChannel()},
+        audit_hook=audit,
+    )
+    envelope = make_envelope("B-OWNERAUDIT")
+
+    result = await fanout.owner_notify(envelope, choice="reviewed")
+
+    assert len(audit.events) == 1
+    ev = audit.events[0]
+    assert ev.contributor_id == "owner"
+    assert ev.owner_notified_at is not None
+    assert ev.owner_choice == "reviewed"
+    assert result.audit.owner_notified_at == ev.owner_notified_at
+    print(f"  [owner] audit event: notified_at={ev.owner_notified_at}, choice={ev.owner_choice}")
+
+
 # ---------------------------------------------------------------------------
 # Main — single event loop, all tests run sequentially
 # ---------------------------------------------------------------------------
@@ -432,6 +607,12 @@ async def main():
         ("audit events written", test_audit_events_written),
         ("retry with backoff", test_retry_with_backoff),
         ("owner notify fires every time", test_owner_notify_fires_every_time),
+        ("owner notify records audit with timestamp", test_owner_notify_records_audit_with_timestamp),
+        ("owner choice recorded later", test_owner_choice_recorded_later_after_notify),
+        ("owner choice invalid rejected", test_owner_choice_invalid_rejected),
+        ("owner choice enum covers ruling", test_owner_choice_enum_covers_ruling),
+        ("webhook HMAC signature", test_webhook_hmac_signature),
+        ("envelope types and builder", test_envelope_types_and_builder),
         ("all channels exhausted", test_all_channels_exhausted_returns_all_results),
     ]
 

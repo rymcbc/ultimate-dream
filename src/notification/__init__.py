@@ -10,6 +10,7 @@ import asyncio
 import time
 import json
 import hashlib
+import hmac
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
@@ -23,6 +24,11 @@ __all__ = [
     "NotificationFanOut",
     "ContributorPrefs",
     "make_channel",
+    "RateLimiter",
+    "OwnerChoice",
+    "OWNER_CHOICES",
+    "EnvelopeType",
+    "build_envelope",
 ]
 
 # ---------------------------------------------------------------------------
@@ -40,6 +46,30 @@ class ChannelType(Enum):
     TELEGRAM = "telegram"
 
 
+class EnvelopeType(Enum):
+    """Envelope types the fan-out knows how to emit."""
+
+    BALLOT_OPEN = "ballot_open"
+    BALLOT_RESULT = "ballot_result"
+    PROPOSAL_MERGED = "proposal_merged"
+    PROPOSAL_REJECTED = "proposal_rejected"
+
+
+class OwnerChoice(Enum):
+    """The owner's disposition of a ballot (2026-11-25 owner ruling).
+
+    ``NONE`` is the default and also stands for silence: the ballot proceeds
+    unless the owner explicitly reviews or overrides it.
+    """
+
+    NONE = "none"
+    REVIEWED = "reviewed"
+    OVERRIDE = "override"
+
+
+OWNER_CHOICES = tuple(c.value for c in OwnerChoice)
+
+
 @dataclass
 class AuditEvent:
     """An audit event written for every send attempt."""
@@ -50,6 +80,9 @@ class AuditEvent:
     outcome: str  # "sent" | "failed"
     reason: str | None = None  # SMTP code, HTTP status, etc.
     timestamp: float = field(default_factory=time.time)
+    # Owner-specific fields (per 2026-11-25 owner ruling)
+    owner_notified_at: float | None = None  # Set when contributor_id == "owner"
+    owner_choice: str | None = None  # "none" | "reviewed" | "override" (silence = "none")
 
 
 @dataclass
@@ -69,6 +102,46 @@ class ContributorPrefs:
 
     contributor_id: str
     channels: list[ChannelType] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Envelope construction (shared contract)
+# ---------------------------------------------------------------------------
+
+
+def build_envelope(
+    envelope_type: EnvelopeType | str,
+    proposal: dict[str, Any],
+    ballot: dict[str, Any] | None = None,
+    calls_to_action: list[dict[str, str]] | None = None,
+) -> dict[str, Any]:
+    """Build a contract-conformant envelope.
+
+    ``envelope_type`` may be an :class:`EnvelopeType` or its string value.
+    ``ballot`` and ``calls_to_action`` are only included when supplied, so
+    ``ballot_result`` / ``proposal_merged`` / ``proposal_rejected`` can carry
+    the fields that make sense for them.
+    """
+    if isinstance(envelope_type, EnvelopeType):
+        type_value = envelope_type.value
+    else:
+        type_value = str(envelope_type)
+        if type_value not in (t.value for t in EnvelopeType):
+            raise ValueError(f"Unknown envelope type: {type_value}")
+
+    envelope: dict[str, Any] = {
+        "type": type_value,
+        "proposal": {
+            "id": proposal.get("id", ""),
+            "title": proposal.get("title", ""),
+            "category": proposal.get("category", ""),
+            "summary": proposal.get("summary", "")[:120],
+        },
+    }
+    if ballot is not None:
+        envelope["ballot"] = dict(ballot)
+    envelope["calls_to_action"] = list(calls_to_action or [])
+    return envelope
 
 
 # ---------------------------------------------------------------------------
@@ -101,6 +174,11 @@ class Channel(ABC):
     def dedupe_key(contributor_id: str, ballot_id: str) -> str:
         """Unique key for deduplication: contributor + ballot."""
         return f"{contributor_id}:{ballot_id}"
+
+    @staticmethod
+    def canonical_body(envelope: dict[str, Any]) -> bytes:
+        """Canonical JSON bytes of an envelope, for HMAC signing."""
+        return json.dumps(envelope, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -246,14 +324,35 @@ class EmailChannel(Channel):
 
 
 class WebhookChannel(Channel):
-    """Generic webhook delivery with HMAC signature — fake/mock for tests."""
+    """Generic webhook delivery with HMAC signature — fake/mock for tests.
 
-    def __init__(self, url: str = "https://example.com/webhook", **kwargs: Any):
+    The real transport POSTs the canonical JSON body with an HMAC-SHA256
+    signature header. The mock still computes the signature so the signing
+    path is exercised (and testable) rather than stubbed out.
+    """
+
+    def __init__(
+        self,
+        url: str = "https://example.com/webhook",
+        secret: str = "fake-webhook-secret",
+        **kwargs: Any,
+    ):
         super().__init__(ChannelType.WEBHOOK)
         self.url = url
+        self.secret = secret
+        self.last_signature: str | None = None
 
     def get_delivery_target(self, contributor_id: str) -> str | None:
         return self.url
+
+    def sign(self, envelope: dict[str, Any]) -> str:
+        """HMAC-SHA256 signature over the canonical envelope body."""
+        mac = hmac.new(
+            self.secret.encode("utf-8"),
+            Channel.canonical_body(envelope),
+            hashlib.sha256,
+        )
+        return mac.hexdigest()
 
     async def send(self, contributor_id: str, envelope: dict[str, Any]) -> SendResult:
         ballot_id = envelope.get("ballot", {}).get("id", "unknown")
@@ -276,6 +375,7 @@ class WebhookChannel(Channel):
         if success:
             # Only mark as sent on actual success — retries of a failure must not be blocked
             self._sent_keys.add(dk)
+            self.last_signature = self.sign(envelope)
             return SendResult(
                 status="sent",
                 channel=self.channel_type,
@@ -468,6 +568,9 @@ class NotificationFanOut:
         self.max_retries = max_retries
         self.backoff_base = backoff_base_seconds
         self.audit_hook = audit_hook or (lambda ev: None)  # no-op by default
+        # owner_notified_at / owner_choice per ballot — the audit log is the
+        # durable record, this map is the live lookup for the ballot engine.
+        self.owner_notifications: dict[str, dict[str, Any]] = {}
 
     def contribute_channel(self, channel: Channel) -> None:
         """Register a channel instance by type."""
@@ -542,24 +645,84 @@ class NotificationFanOut:
         # All channels exhausted — notification failed globally, all results surfaced
         return results
 
-    async def owner_notify(self, envelope: dict[str, Any]) -> SendResult:
+    async def owner_notify(
+        self, envelope: dict[str, Any], choice: str = OwnerChoice.NONE.value
+    ) -> SendResult:
         """Mandatory Discord DM to the owner (Ryan) at T0 of every ballot.
 
         Fires every time, even if contributor notifications are muted.
         Records owner_notified_at in audit log and his choice (none | reviewed | override).
+
+        Args:
+            envelope: The ballot envelope
+            choice: Owner's choice - "none" | "reviewed" | "override" (default "none", silence = "none")
         """
+        if choice not in OWNER_CHOICES:
+            raise ValueError(
+                f"Invalid owner choice {choice!r}; expected one of {', '.join(OWNER_CHOICES)}"
+            )
+
         ballot_id = envelope.get("ballot", {}).get("id", "unknown")
+        notified_at = time.time()
         result = SendResult(
             status="sent",
             channel=ChannelType.DISCORD_DM,
-            message_id=f"owner_discord_msg_{int(time.time())}",
+            message_id=f"owner_discord_msg_{int(notified_at)}",
             reason="owner notified",
             audit=AuditEvent(
                 ballot_id=ballot_id,
                 channel=ChannelType.DISCORD_DM,
                 contributor_id="owner",
                 outcome="sent",
+                owner_notified_at=notified_at,
+                owner_choice=choice,
             ),
         )
         self.audit_hook(result.audit)
+        self.owner_notifications[ballot_id] = {
+            "owner_notified_at": notified_at,
+            "owner_choice": choice,
+            "message_id": result.message_id,
+        }
         return result
+
+    def record_owner_choice(self, ballot_id: str, choice: str) -> dict[str, Any]:
+        """Record the owner's disposition of a ballot after the T0 notification.
+
+        The owner may reply long after the DM went out; silence stays ``none``
+        and the ballot proceeds. This updates the recorded state and writes an
+        audit event so the change is not invisible.
+        """
+        if choice not in OWNER_CHOICES:
+            raise ValueError(
+                f"Invalid owner choice {choice!r}; expected one of {', '.join(OWNER_CHOICES)}"
+            )
+
+        record = self.owner_notifications.setdefault(
+            ballot_id,
+            {
+                "owner_notified_at": None,
+                "owner_choice": OwnerChoice.NONE.value,
+                "message_id": None,
+            },
+        )
+        record["owner_choice"] = choice
+        self.audit_hook(
+            AuditEvent(
+                ballot_id=ballot_id,
+                channel=ChannelType.DISCORD_DM,
+                contributor_id="owner",
+                outcome="sent",
+                reason=f"owner_choice={choice}",
+                owner_notified_at=record.get("owner_notified_at"),
+                owner_choice=choice,
+            )
+        )
+        return record
+
+    def get_owner_choice(self, ballot_id: str) -> str:
+        """The recorded owner choice for a ballot; ``none`` when unrecorded."""
+        record = self.owner_notifications.get(ballot_id)
+        if not record:
+            return OwnerChoice.NONE.value
+        return record.get("owner_choice", OwnerChoice.NONE.value)
